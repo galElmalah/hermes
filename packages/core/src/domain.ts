@@ -1,0 +1,1124 @@
+/**
+ * Canonical domain contract for Hermes.
+ *
+ * Every layer (worker API, Garmin sync, metrics engine, web app) codes against
+ * these schemas. API payloads are camelCase and validated with these zod
+ * schemas; the D1 schema mirrors them in snake_case.
+ *
+ * Conventions
+ *  - Local calendar dates: 'YYYY-MM-DD' strings (LocalDate). Never Date objects.
+ *  - Instants: ISO-8601 UTC strings ('2026-11-21T07:30:00Z').
+ *  - Durations: seconds. Distances: meters. Speed: m/s. Power: watts.
+ *    Elevation: meters. Weight: kilograms. HR: bpm. Unit conversion is UI-only.
+ *  - "Load" is the single training-load currency (1 h at threshold = 100).
+ *  - ISO weeks: 'YYYY-Www' (e.g. '2026-W47'); weeks start on Monday.
+ */
+import { z } from 'zod';
+
+// ───────────────────────────── primitives ─────────────────────────────
+
+export const LocalDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'YYYY-MM-DD');
+export type LocalDate = z.infer<typeof LocalDate>;
+
+export const IsoWeek = z.string().regex(/^\d{4}-W\d{2}$/, 'YYYY-Www');
+export type IsoWeek = z.infer<typeof IsoWeek>;
+
+export const IsoInstant = z.string().min(10);
+export type IsoInstant = z.infer<typeof IsoInstant>;
+
+export const SPORTS = [
+  'bike',
+  'run',
+  'swim',
+  'row',
+  'strength',
+  'hike',
+  'walk',
+  'yoga',
+  'ski',
+  'other',
+] as const;
+export const Sport = z.enum(SPORTS);
+export type Sport = z.infer<typeof Sport>;
+
+export const SUB_SPORTS = [
+  // bike
+  'road', 'indoor', 'mtb', 'gravel', 'virtual',
+  // run
+  'road_run', 'trail', 'treadmill', 'track',
+  // swim
+  'pool', 'open_water',
+  // row
+  'erg', 'on_water',
+  // strength
+  'gym', 'bodyweight', 'mobility', 'hiit',
+  'generic',
+] as const;
+export const SubSport = z.enum(SUB_SPORTS);
+export type SubSport = z.infer<typeof SubSport>;
+
+/** Display metadata; glyph names map to the icon set in the web app. */
+export const SPORT_META: Record<Sport, { label: string; hasDistance: boolean; subSports: SubSport[] }> = {
+  bike: { label: 'Ride', hasDistance: true, subSports: ['road', 'indoor', 'virtual', 'gravel', 'mtb'] },
+  run: { label: 'Run', hasDistance: true, subSports: ['road_run', 'trail', 'treadmill', 'track'] },
+  swim: { label: 'Swim', hasDistance: true, subSports: ['pool', 'open_water'] },
+  row: { label: 'Row', hasDistance: true, subSports: ['erg', 'on_water'] },
+  strength: { label: 'Strength', hasDistance: false, subSports: ['gym', 'bodyweight', 'mobility', 'hiit'] },
+  hike: { label: 'Hike', hasDistance: true, subSports: ['generic'] },
+  walk: { label: 'Walk', hasDistance: true, subSports: ['generic'] },
+  yoga: { label: 'Yoga', hasDistance: false, subSports: ['generic'] },
+  ski: { label: 'Ski', hasDistance: true, subSports: ['generic'] },
+  other: { label: 'Other', hasDistance: false, subSports: ['generic'] },
+};
+
+// ───────────────────────────── intensity ─────────────────────────────
+
+export const INTENSITY_CLASSES = ['recovery', 'endurance', 'tempo', 'threshold', 'high', 'race'] as const;
+export const IntensityClass = z.enum(INTENSITY_CLASSES);
+export type IntensityClass = z.infer<typeof IntensityClass>;
+
+/** Pip count 1–5 on cards; race renders a flag. */
+export const INTENSITY_META: Record<IntensityClass, { label: string; level: 1 | 2 | 3 | 4 | 5; bucket: 'easy' | 'moderate' | 'hard' }> = {
+  recovery: { label: 'Recovery', level: 1, bucket: 'easy' },
+  endurance: { label: 'Endurance', level: 2, bucket: 'easy' },
+  tempo: { label: 'Tempo', level: 3, bucket: 'moderate' },
+  threshold: { label: 'Threshold', level: 4, bucket: 'hard' },
+  high: { label: 'High', level: 5, bucket: 'hard' },
+  race: { label: 'Race', level: 5, bucket: 'hard' },
+};
+
+// ───────────────────────────── compliance ─────────────────────────────
+
+export const COMPLIANCE_STATES = [
+  'planned', // future, or today and not yet done
+  'on_target', // 80–120 %
+  'partial_short', // 50–79 %
+  'partial_long', // 121–150 %
+  'off_short', // < 50 %
+  'off_long', // > 150 %
+  'missed', // planned date passed, unpaired
+  'excused', // skipped with reason / sick-injured day
+  'unplanned', // completed with no plan
+] as const;
+export const ComplianceState = z.enum(COMPLIANCE_STATES);
+export type ComplianceState = z.infer<typeof ComplianceState>;
+
+export const Compliance = z.object({
+  metric: z.enum(['load', 'duration', 'distance']),
+  ratio: z.number(), // actual / planned, e.g. 0.93
+  state: ComplianceState,
+  /**
+   * Execution adherence 0–100 from the step-by-step plan-vs-actual analysis, present only when a
+   * structured analysis exists (then `state` is derived from it, see workout/execution.ts).
+   */
+  score: z.number().optional(),
+});
+export type Compliance = z.infer<typeof Compliance>;
+
+// ───────────────────────────── workout structure ─────────────────────────────
+
+export const Target = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('open') }),
+  z.object({ type: z.literal('power_pct'), low: z.number(), high: z.number() }), // % of threshold power
+  z.object({ type: z.literal('power_w'), low: z.number(), high: z.number() }),
+  z.object({ type: z.literal('hr_zone'), zone: z.number().int().min(1).max(7) }),
+  z.object({ type: z.literal('hr_pct_lthr'), low: z.number(), high: z.number() }),
+  z.object({ type: z.literal('hr_bpm'), low: z.number(), high: z.number() }),
+  /** Absolute pace as speed range in m/s (low = slower bound). UI renders per-unit pace. */
+  z.object({ type: z.literal('pace'), lowMps: z.number(), highMps: z.number() }),
+  /** % of threshold speed (run threshold pace / swim CSS / row threshold split). */
+  z.object({ type: z.literal('pace_pct'), low: z.number(), high: z.number() }),
+  z.object({ type: z.literal('rpe'), low: z.number(), high: z.number() }),
+  z.object({ type: z.literal('cadence'), low: z.number(), high: z.number() }),
+  /** Linear ramp between two intensities expressed in `basis` units. */
+  z.object({
+    type: z.literal('ramp'),
+    basis: z.enum(['power_pct', 'pace_pct', 'hr_pct_lthr']),
+    from: z.number(),
+    to: z.number(),
+  }),
+]);
+export type Target = z.infer<typeof Target>;
+
+export const StepMeasure = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('time'), sec: z.number().positive() }),
+  z.object({ type: z.literal('distance'), m: z.number().positive() }),
+  z.object({ type: z.literal('lap_button') }),
+  z.object({ type: z.literal('reps'), n: z.number().int().positive() }),
+]);
+export type StepMeasure = z.infer<typeof StepMeasure>;
+
+export const STEP_ROLES = ['warmup', 'active', 'recovery', 'rest', 'cooldown', 'other'] as const;
+export const StepRole = z.enum(STEP_ROLES);
+export type StepRole = z.infer<typeof StepRole>;
+
+export const SWIM_STROKES = ['free', 'back', 'breast', 'fly', 'im', 'choice', 'kick', 'drill'] as const;
+export const SWIM_EQUIPMENT = ['pull_buoy', 'paddles', 'fins', 'kick_board', 'snorkel'] as const;
+
+export const StrengthPrescription = z.object({
+  exercise: z.string(), // free-text name; `exerciseKey` maps to the catalog when known
+  exerciseKey: z.string().optional(),
+  sets: z.number().int().positive(),
+  reps: z.number().int().positive().optional(),
+  durationSec: z.number().positive().optional(),
+  weightKg: z.number().nonnegative().optional(),
+  rpe: z.number().min(1).max(10).optional(),
+  restSec: z.number().nonnegative().optional(),
+  supersetGroup: z.string().optional(),
+});
+export type StrengthPrescription = z.infer<typeof StrengthPrescription>;
+
+export const Step = z.object({
+  kind: z.literal('step'),
+  id: z.string(), // stable client id for layout animation keys
+  role: StepRole,
+  label: z.string().optional(),
+  cue: z.string().optional(),
+  measure: StepMeasure,
+  target: Target.optional(),
+  secondary: Target.optional(),
+  swim: z
+    .object({
+      stroke: z.enum(SWIM_STROKES).optional(),
+      equipment: z.array(z.enum(SWIM_EQUIPMENT)).optional(),
+      sendOffSec: z.number().positive().optional(),
+      restSec: z.number().nonnegative().optional(),
+    })
+    .optional(),
+  row: z.object({ strokeRateLow: z.number().optional(), strokeRateHigh: z.number().optional() }).optional(),
+  strength: StrengthPrescription.optional(),
+});
+export type Step = z.infer<typeof Step>;
+
+/** Inner repeat: only plain steps. */
+export const InnerRepeat = z.object({
+  kind: z.literal('repeat'),
+  id: z.string(),
+  count: z.number().int().min(1),
+  label: z.string().optional(),
+  steps: z.array(Step),
+});
+export type InnerRepeat = z.infer<typeof InnerRepeat>;
+
+/** Outer repeat: steps or one more level of repeat (max nesting depth 2). */
+export const Repeat = z.object({
+  kind: z.literal('repeat'),
+  id: z.string(),
+  count: z.number().int().min(1),
+  label: z.string().optional(),
+  steps: z.array(z.discriminatedUnion('kind', [Step, InnerRepeat])),
+});
+export type Repeat = z.infer<typeof Repeat>;
+
+export const StructureNode = z.discriminatedUnion('kind', [Step, Repeat]);
+export type StructureNode = z.infer<typeof StructureNode>;
+
+export const WorkoutStructure = z.object({
+  steps: z.array(StructureNode),
+  poolLengthM: z.number().positive().optional(),
+});
+export type WorkoutStructure = z.infer<typeof WorkoutStructure>;
+
+// ───────────────────────────── execution (plan vs actual) ─────────────────────────────
+
+/** Measurable channel a step target is judged in. Native units: m/s, W, bpm, rpm (spm for run). */
+export const EXECUTION_METRICS = ['speed', 'power', 'hr', 'cadence'] as const;
+export const ExecutionMetric = z.enum(EXECUTION_METRICS);
+export type ExecutionMetric = z.infer<typeof ExecutionMetric>;
+
+export const EXECUTION_VERDICTS = ['on_target', 'over', 'under', 'skipped', 'extra'] as const;
+export const ExecutionVerdict = z.enum(EXECUTION_VERDICTS);
+export type ExecutionVerdict = z.infer<typeof ExecutionVerdict>;
+
+/** A planned target resolved to the band it is judged against. */
+export const ExecutionTarget = z.object({
+  metric: ExecutionMetric,
+  /** Band judged (native units; point targets are widened by a small tolerance). low ≤ high. */
+  low: z.number(),
+  high: z.number(),
+  /** The target as planned (before widening): equal for a point target such as "5:00/km". */
+  plannedLow: z.number(),
+  plannedHigh: z.number(),
+  /** Ramp endpoints (native units) when the target is a ramp. */
+  from: z.number().optional(),
+  to: z.number().optional(),
+  /** Display text in the athlete's units: "5:00/km", "8:03–8:57/km", "238–250 W", "HR Z2 · 147–161 bpm". */
+  text: z.string(),
+});
+export type ExecutionTarget = z.infer<typeof ExecutionTarget>;
+
+export const ExecutionStep = z.object({
+  /** Position in the planned execution order (repeats unrolled), null for an extra segment. */
+  plannedIndex: z.number().int().nullable(),
+  stepId: z.string().nullable(),
+  role: StepRole.nullable(),
+  /** "Warm-up", "Rep 2 of 5", "Recovery 2 of 5", "Cool-down", "Extra". */
+  label: z.string(),
+  repeat: z.object({ iteration: z.number().int(), count: z.number().int() }).nullable(),
+  /** Share of the overall score (0–1; all steps sum to 1, extras that do not count are 0). */
+  weight: z.number(),
+  planned: z
+    .object({
+      measure: z.enum(['time', 'distance', 'lap_button', 'reps']),
+      durationSec: z.number().nullable(), // as planned for time steps, estimated otherwise
+      distanceM: z.number().nullable(), // as planned for distance steps, estimated otherwise
+      target: ExecutionTarget.nullable(), // null: open / RPE / no threshold to resolve it
+      targetText: z.string().nullable(), // planned target text even when it is not measurable ("RPE 7")
+    })
+    .nullable(),
+  actual: z
+    .object({
+      startSec: z.number(), // seconds from the activity start (stream/lap timeline)
+      endSec: z.number(),
+      durationSec: z.number(), // recorded seconds in the step (pauses excluded)
+      distanceM: z.number().nullable(),
+      avgSpeedMps: z.number().nullable(),
+      avgHr: z.number().nullable(),
+      avgPower: z.number().nullable(),
+      avgCadence: z.number().nullable(),
+    })
+    .nullable(),
+  intensity: z
+    .object({
+      metric: ExecutionMetric,
+      actual: z.number(), // average in the target's metric (native units)
+      actualStart: z.number().optional(), // ramps: first 20 % of the step
+      actualEnd: z.number().optional(), // ramps: last 20 % of the step
+      /** Signed distance to the band (native units; 0 inside). Positive = harder (faster / more W / higher HR). */
+      delta: z.number(),
+      /** delta as a fraction of the band edge it was measured from (0.04 = 4 % harder). */
+      deltaPct: z.number(),
+      /** For pace targets: the same deviation in seconds per pace unit, positive = faster. */
+      deltaPaceSec: z.number().optional(),
+      /** Share of the step's samples inside the band, 0–100 (null without streams). */
+      inTargetPct: z.number().nullable(),
+      verdict: z.enum(['on', 'over', 'under']),
+    })
+    .nullable(),
+  duration: z
+    .object({
+      basis: z.enum(['time', 'distance']),
+      planned: z.number(), // s or m
+      actual: z.number(),
+      delta: z.number(), // actual − planned (s or m)
+      verdict: z.enum(['on', 'long', 'short']),
+    })
+    .nullable(),
+  verdict: ExecutionVerdict,
+  /** Plain signed deviation: "12 s/km faster than target · ended 0:40 early". Null when on target. */
+  deviation: z.string().nullable(),
+  /** 0–100 for planned steps (skipped = 0); null for extras. */
+  score: z.number().nullable(),
+});
+export type ExecutionStep = z.infer<typeof ExecutionStep>;
+
+export const ExecutionTotals = z.object({
+  durationSec: z.number().nullable(),
+  distanceM: z.number().nullable(),
+  load: z.number().nullable(),
+});
+export type ExecutionTotals = z.infer<typeof ExecutionTotals>;
+
+/** Plan-vs-actual analysis of a planned workout and its paired activity. */
+export const ExecutionAnalysis = z.object({
+  version: z.number().int(),
+  workoutId: z.string(),
+  activityId: z.string(),
+  /** laps = one lap per planned step; streams = aligned on the 1 Hz recording; session = totals only. */
+  method: z.enum(['laps', 'streams', 'session']),
+  confidence: z.enum(['high', 'medium', 'low']),
+  /** Why the method/confidence (shown in small print), e.g. "Laps match the plan's 12 steps". */
+  note: z.string(),
+  /** Adherence 0–100. */
+  score: z.number(),
+  /** Coarse state for chips (same vocabulary as Compliance.state). */
+  state: ComplianceState,
+  /** One plain line: "Hit 4 of 5 reps; reps ran 6–10 s/km fast; cut the cool-down short". */
+  summary: z.string(),
+  counts: z.object({
+    planned: z.number().int(),
+    onTarget: z.number().int(),
+    over: z.number().int(),
+    under: z.number().int(),
+    skipped: z.number().int(),
+    extra: z.number().int(),
+  }),
+  planned: ExecutionTotals,
+  actual: ExecutionTotals,
+  /** Execution order, extras interleaved where they happened. Empty when method = session. */
+  steps: z.array(ExecutionStep),
+});
+export type ExecutionAnalysis = z.infer<typeof ExecutionAnalysis>;
+
+// ───────────────────────────── planned workouts ─────────────────────────────
+
+export const SKIP_REASONS = ['sick', 'injury', 'travel', 'fatigue', 'life', 'weather', 'other'] as const;
+
+export const GarminLink = z.object({
+  workoutId: z.string().optional(),
+  scheduleId: z.string().optional(),
+  syncState: z.enum(['none', 'pending', 'synced', 'error']),
+  lastPushedAt: IsoInstant.optional(),
+  error: z.string().optional(),
+});
+export type GarminLink = z.infer<typeof GarminLink>;
+
+export const PlannedWorkout = z.object({
+  id: z.string(),
+  date: LocalDate,
+  startTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+  sport: Sport,
+  subSport: SubSport.optional(),
+  title: z.string(),
+  description: z.string().optional(), // purpose / coaching cues (markdown)
+  preNote: z.string().optional(),
+  plannedDurationSec: z.number().nonnegative().optional(),
+  plannedDistanceM: z.number().nonnegative().optional(),
+  plannedLoad: z.number().nonnegative().optional(),
+  plannedIntensityFactor: z.number().nonnegative().optional(),
+  structure: WorkoutStructure.optional(),
+  isKey: z.boolean(),
+  intensity: IntensityClass,
+  tags: z.array(z.string()),
+  environment: z.enum(['indoor', 'outdoor', 'any']),
+  templateId: z.string().optional(),
+  seriesId: z.string().optional(),
+  eventId: z.string().optional(),
+  pairedActivityId: z.string().optional(),
+  status: z.enum(['planned', 'skipped']),
+  skipReason: z.enum(SKIP_REASONS).optional(),
+  /** Derived server-side on read (never stored). */
+  compliance: Compliance.optional(),
+  /** ≤ 48 values 0..1: planned intensity profile for the calendar card (derived from structure). */
+  sparkline: z.array(z.number()).optional(),
+  garmin: GarminLink,
+  createdAt: IsoInstant,
+  updatedAt: IsoInstant,
+});
+export type PlannedWorkout = z.infer<typeof PlannedWorkout>;
+
+/** `GET /workouts/:id`: the workout plus its execution analysis when it is paired. */
+export const PlannedWorkoutDetail = PlannedWorkout.extend({ execution: ExecutionAnalysis.optional() });
+export type PlannedWorkoutDetail = z.infer<typeof PlannedWorkoutDetail>;
+
+/** Create/update payloads: server fills ids, timestamps, derived planned totals. */
+export const PlannedWorkoutInput = PlannedWorkout.omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  compliance: true,
+  sparkline: true,
+  garmin: true,
+  pairedActivityId: true,
+}).partial({ isKey: true, intensity: true, tags: true, environment: true, status: true });
+export type PlannedWorkoutInput = z.infer<typeof PlannedWorkoutInput>;
+
+export const Template = z.object({
+  id: z.string(),
+  sport: Sport,
+  subSport: SubSport.optional(),
+  title: z.string(),
+  description: z.string().optional(),
+  plannedDurationSec: z.number().nonnegative().optional(),
+  plannedDistanceM: z.number().nonnegative().optional(),
+  plannedLoad: z.number().nonnegative().optional(),
+  plannedIntensityFactor: z.number().nonnegative().optional(),
+  structure: WorkoutStructure.optional(),
+  intensity: IntensityClass,
+  tags: z.array(z.string()),
+  folder: z.string().optional(),
+  usageCount: z.number().int().nonnegative(),
+  lastUsedAt: IsoInstant.optional(),
+  createdAt: IsoInstant,
+  updatedAt: IsoInstant,
+});
+export type Template = z.infer<typeof Template>;
+
+// ───────────────────────────── completed activities ─────────────────────────────
+
+export const LOAD_SOURCES = ['power', 'pace', 'swim_pace', 'hr', 'rpe', 'duration', 'device', 'manual'] as const;
+export const LoadSource = z.enum(LOAD_SOURCES);
+export type LoadSource = z.infer<typeof LoadSource>;
+
+export const Activity = z.object({
+  id: z.string(),
+  source: z.enum(['garmin', 'upload', 'manual', 'demo']),
+  garminActivityId: z.string().optional(),
+  /** Raw Garmin activityType.typeKey, kept so unmapped types are not lost as 'other'. */
+  garminTypeKey: z.string().optional(),
+  startedAt: IsoInstant,
+  utcOffsetMin: z.number().int(), // local = UTC + offset
+  localDate: LocalDate,
+  sport: Sport,
+  subSport: SubSport.optional(),
+  title: z.string(),
+  durationSec: z.number().nonnegative(), // elapsed
+  movingSec: z.number().nonnegative(),
+  distanceM: z.number().nonnegative().optional(),
+  elevationGainM: z.number().nonnegative().optional(),
+  load: z.number().nonnegative(),
+  loadSource: LoadSource,
+  intensityFactor: z.number().nonnegative().optional(),
+  avgHr: z.number().optional(),
+  maxHr: z.number().optional(),
+  avgPower: z.number().optional(),
+  weightedPower: z.number().optional(), // "Weighted Power" (NP-equivalent)
+  maxPower: z.number().optional(),
+  avgSpeedMps: z.number().optional(),
+  adjustedSpeedMps: z.number().optional(), // grade-adjusted (run)
+  avgCadence: z.number().optional(),
+  calories: z.number().optional(),
+  workKj: z.number().optional(),
+  variability: z.number().optional(),
+  efficiency: z.number().optional(),
+  decouplingPct: z.number().optional(),
+  aerobicEffect: z.number().optional(), // device training effect 0–5
+  anaerobicEffect: z.number().optional(),
+  // swim
+  poolLengthM: z.number().optional(),
+  strokes: z.number().optional(),
+  avgSwolf: z.number().optional(),
+  // strength
+  totalSets: z.number().optional(),
+  totalReps: z.number().optional(),
+  volumeKg: z.number().optional(),
+  intensityAuto: IntensityClass,
+  intensityOverride: IntensityClass.optional(),
+  /** Resolved: override ?? auto. */
+  intensity: IntensityClass,
+  isKey: z.boolean(),
+  rpe: z.number().int().min(1).max(10).optional(),
+  feel: z.number().int().min(1).max(5).optional(), // 1 awful … 5 great
+  postNote: z.string().optional(),
+  tags: z.array(z.string()),
+  pairedWorkoutId: z.string().optional(),
+  compliance: Compliance.optional(),
+  hasStreams: z.boolean(),
+  /** ≤ 48 values 0..1, downsampled effort profile for the calendar card sparkline. */
+  sparkline: z.array(z.number()).optional(),
+  /** Place name reported by Garmin (e.g. "Girona"); absent for FIT uploads, indoor and GPS-less sessions. */
+  locationName: z.string().optional(),
+  createdAt: IsoInstant,
+  updatedAt: IsoInstant,
+});
+export type Activity = z.infer<typeof Activity>;
+
+export const Lap = z.object({
+  index: z.number().int(),
+  startSec: z.number(),
+  durationSec: z.number(),
+  movingSec: z.number().optional(),
+  distanceM: z.number().optional(),
+  avgHr: z.number().optional(),
+  maxHr: z.number().optional(),
+  avgPower: z.number().optional(),
+  weightedPower: z.number().optional(),
+  avgSpeedMps: z.number().optional(),
+  avgCadence: z.number().optional(),
+  elevationGainM: z.number().optional(),
+  // swim
+  lengths: z.number().optional(),
+  stroke: z.string().optional(),
+  swolf: z.number().optional(),
+  isRest: z.boolean().optional(),
+  // detail (all optional; present when the device / streams report them)
+  maxPower: z.number().optional(),
+  maxSpeedMps: z.number().optional(),
+  maxCadence: z.number().optional(),
+  elevationLossM: z.number().optional(),
+  avgTempC: z.number().optional(),
+  calories: z.number().optional(),
+  /** Swim strokes / row strokes in the lap. */
+  strokes: z.number().optional(),
+  // running dynamics
+  avgGroundContactMs: z.number().optional(),
+  avgVerticalOscillationCm: z.number().optional(),
+  avgVerticalRatioPct: z.number().optional(),
+  avgStrideLengthM: z.number().optional(),
+});
+export type Lap = z.infer<typeof Lap>;
+
+/** One pool length (FIT `length` message). Idle lengths are rests. */
+export const SwimLength = z.object({
+  index: z.number().int(),
+  /** Lap (interval) this length belongs to, when known. */
+  lapIndex: z.number().int().optional(),
+  startSec: z.number(),
+  durationSec: z.number(),
+  stroke: z.string().optional(),
+  strokes: z.number().optional(),
+  /** strokes / min */
+  strokeRate: z.number().optional(),
+  swolf: z.number().optional(),
+  isRest: z.boolean().optional(),
+});
+export type SwimLength = z.infer<typeof SwimLength>;
+
+/** A sensor paired during the activity (FIT `device_info`). `kind` is a short English noun phrase. */
+export const ActivitySensor = z.object({ kind: z.string(), name: z.string().optional() });
+export type ActivitySensor = z.infer<typeof ActivitySensor>;
+
+/**
+ * Everything else the device / Garmin reports (or Hermes derives from the streams) that is only
+ * shown on the activity page. Every field is optional: an absent fact is simply not shown.
+ */
+export const ActivityFacts = z.object({
+  // where
+  startLat: z.number().optional(),
+  startLng: z.number().optional(),
+  endLat: z.number().optional(),
+  endLng: z.number().optional(),
+  timezone: z.string().optional(), // IANA
+  // time
+  timerSec: z.number().optional(),
+  pausedSec: z.number().optional(),
+  pauseCount: z.number().int().optional(),
+  // speed
+  maxSpeedMps: z.number().optional(),
+  // elevation
+  elevationLossM: z.number().optional(),
+  minAltitudeM: z.number().optional(),
+  maxAltitudeM: z.number().optional(),
+  /** Steepest sustained climb / descent in percent (descent negative). */
+  maxGradePct: z.number().optional(),
+  minGradePct: z.number().optional(),
+  // heart rate
+  minHr: z.number().optional(),
+  // power
+  /** Left share of total power, percent (50 = balanced). */
+  powerBalanceLeftPct: z.number().optional(),
+  // cadence
+  maxCadence: z.number().optional(),
+  // running dynamics
+  avgGroundContactMs: z.number().optional(),
+  /** Left share of ground contact time, percent. */
+  avgGroundContactBalanceLeftPct: z.number().optional(),
+  avgVerticalOscillationCm: z.number().optional(),
+  avgVerticalRatioPct: z.number().optional(),
+  avgStrideLengthM: z.number().optional(),
+  steps: z.number().optional(),
+  // swim / row
+  activeLengths: z.number().optional(),
+  avgStrokesPerLength: z.number().optional(),
+  avgDistancePerStrokeM: z.number().optional(),
+  /** Total strokes for sports other than swimming (rowing). */
+  totalStrokes: z.number().optional(),
+  // conditions
+  avgTempC: z.number().optional(),
+  minTempC: z.number().optional(),
+  maxTempC: z.number().optional(),
+  // energy & effect
+  /** Garmin's EPOC-based training load (not Hermes Load). */
+  deviceLoad: z.number().optional(),
+  /** Garmin's primary training benefit, e.g. "TEMPO", "VO2MAX". */
+  trainingEffectLabel: z.string().optional(),
+  sweatLossMl: z.number().optional(),
+  // device
+  deviceName: z.string().optional(),
+  deviceSoftware: z.string().optional(),
+  sensors: z.array(ActivitySensor).optional(),
+  /** Sport profile used on the device ("Road Bike", "Pool Swim"). */
+  sportProfile: z.string().optional(),
+});
+export type ActivityFacts = z.infer<typeof ActivityFacts>;
+
+export const ZoneTime = z.object({
+  zone: z.number().int(), // 1-based
+  name: z.string(),
+  low: z.number().nullable(), // in the zone model's native unit (W, bpm, m/s)
+  high: z.number().nullable(),
+  seconds: z.number(),
+});
+export type ZoneTime = z.infer<typeof ZoneTime>;
+
+/** Mean-maximal point: best average `value` held for `durationSec`. */
+export const PeakPoint = z.object({ durationSec: z.number(), value: z.number(), startSec: z.number().optional() });
+export type PeakPoint = z.infer<typeof PeakPoint>;
+
+/** Best time over a fixed distance (run / swim / row). */
+export const BestEffort = z.object({ distanceM: z.number(), timeSec: z.number(), startSec: z.number().optional() });
+export type BestEffort = z.infer<typeof BestEffort>;
+
+export const StrengthSet = z.object({
+  index: z.number().int(),
+  exercise: z.string(),
+  category: z.string().optional(),
+  reps: z.number().optional(),
+  weightKg: z.number().optional(),
+  durationSec: z.number().optional(),
+  isRest: z.boolean().optional(),
+});
+export type StrengthSet = z.infer<typeof StrengthSet>;
+
+export const ThresholdSnapshot = z.object({
+  ftp: z.number().optional(), // W (bike)
+  runThresholdMps: z.number().optional(),
+  swimCssMps: z.number().optional(),
+  rowThresholdW: z.number().optional(),
+  lthr: z.number().optional(),
+  hrMax: z.number().optional(),
+  hrRest: z.number().optional(),
+  weightKg: z.number().optional(),
+});
+export type ThresholdSnapshot = z.infer<typeof ThresholdSnapshot>;
+
+export const ActivityDetail = Activity.extend({
+  laps: z.array(Lap),
+  zones: z.object({
+    hr: z.array(ZoneTime).optional(),
+    power: z.array(ZoneTime).optional(),
+    pace: z.array(ZoneTime).optional(),
+  }),
+  peaks: z.object({
+    power: z.array(PeakPoint).optional(),
+    hr: z.array(PeakPoint).optional(),
+    speed: z.array(PeakPoint).optional(), // m/s
+    efforts: z.array(BestEffort).optional(),
+  }),
+  strengthSets: z.array(StrengthSet).optional(),
+  /** Device-reported and stream-derived extras (location, dynamics, temperature, device…). */
+  facts: ActivityFacts.optional(),
+  /** Pool swims: every length. */
+  swimLengths: z.array(SwimLength).optional(),
+  thresholdsUsed: ThresholdSnapshot,
+  plannedWorkout: PlannedWorkout.optional(),
+  /** Plan-vs-actual execution analysis, present when the activity is paired with a planned workout. */
+  execution: ExecutionAnalysis.optional(),
+  /** The previous activity of the same sport with similar duration, for comparison. */
+  previousSimilar: Activity.optional(),
+});
+export type ActivityDetail = z.infer<typeof ActivityDetail>;
+
+/**
+ * 1 Hz (resampled) time series. All arrays share the length of `t`.
+ * null = no sample. `latlng` is omitted for indoor sessions.
+ */
+export const ActivityStreams = z.object({
+  t: z.array(z.number()), // seconds from start
+  hr: z.array(z.number().nullable()).optional(),
+  power: z.array(z.number().nullable()).optional(),
+  speed: z.array(z.number().nullable()).optional(), // m/s
+  cadence: z.array(z.number().nullable()).optional(),
+  altitude: z.array(z.number().nullable()).optional(), // m
+  distance: z.array(z.number().nullable()).optional(), // cumulative m
+  grade: z.array(z.number().nullable()).optional(), // fraction
+  temp: z.array(z.number().nullable()).optional(),
+  lat: z.array(z.number().nullable()).optional(),
+  lng: z.array(z.number().nullable()).optional(),
+});
+export type ActivityStreams = z.infer<typeof ActivityStreams>;
+export const STREAM_CHANNELS = ['hr', 'power', 'speed', 'cadence', 'altitude', 'distance', 'grade', 'temp', 'lat', 'lng'] as const;
+export type StreamChannel = (typeof STREAM_CHANNELS)[number];
+
+export const ActivityPatch = z
+  .object({
+    title: z.string(),
+    sport: Sport,
+    subSport: SubSport,
+    isKey: z.boolean(),
+    intensityOverride: IntensityClass.nullable(),
+    rpe: z.number().int().min(1).max(10).nullable(),
+    feel: z.number().int().min(1).max(5).nullable(),
+    postNote: z.string().nullable(),
+    tags: z.array(z.string()),
+  })
+  .partial();
+export type ActivityPatch = z.infer<typeof ActivityPatch>;
+
+export const ManualActivityInput = z.object({
+  localDate: LocalDate,
+  startTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+  sport: Sport,
+  subSport: SubSport.optional(),
+  title: z.string(),
+  durationSec: z.number().positive(),
+  distanceM: z.number().nonnegative().optional(),
+  avgHr: z.number().optional(),
+  avgPower: z.number().optional(),
+  rpe: z.number().int().min(1).max(10).optional(),
+  feel: z.number().int().min(1).max(5).optional(),
+  postNote: z.string().optional(),
+  load: z.number().nonnegative().optional(), // manual override
+});
+export type ManualActivityInput = z.infer<typeof ManualActivityInput>;
+
+// ───────────────────────────── calendar furniture ─────────────────────────────
+
+export const Event = z.object({
+  id: z.string(),
+  date: LocalDate,
+  name: z.string(),
+  priority: z.enum(['A', 'B', 'C']),
+  sport: Sport.optional(),
+  distanceM: z.number().optional(),
+  goal: z.string().optional(),
+  location: z.string().optional(),
+  note: z.string().optional(),
+  resultActivityId: z.string().optional(),
+});
+export type Event = z.infer<typeof Event>;
+
+export const PHASE_TYPES = ['base', 'build', 'peak', 'taper', 'race', 'recovery', 'transition'] as const;
+export const Phase = z.object({
+  id: z.string(),
+  type: z.enum(PHASE_TYPES),
+  label: z.string(),
+  startDate: LocalDate, // inclusive, a Monday
+  endDate: LocalDate, // inclusive, a Sunday
+  weeklyLoadTarget: z.number().optional(),
+});
+export type Phase = z.infer<typeof Phase>;
+
+export const DAY_MARKER_TYPES = ['rest', 'sick', 'injured', 'travel', 'vacation', 'altitude'] as const;
+export const DayMarker = z.object({
+  id: z.string(),
+  type: z.enum(DAY_MARKER_TYPES),
+  date: LocalDate,
+  endDate: LocalDate.optional(), // inclusive
+  label: z.string().optional(),
+});
+export type DayMarker = z.infer<typeof DayMarker>;
+
+export const DayNote = z.object({ date: LocalDate, body: z.string(), updatedAt: IsoInstant });
+export type DayNote = z.infer<typeof DayNote>;
+
+export const WeekNote = z.object({
+  isoWeek: IsoWeek,
+  body: z.string(),
+  targetHours: z.number().optional(),
+  targetLoad: z.number().optional(),
+  updatedAt: IsoInstant,
+});
+export type WeekNote = z.infer<typeof WeekNote>;
+
+export const WellnessDay = z.object({
+  date: LocalDate,
+  hrvMs: z.number().optional(), // overnight rMSSD
+  hrvStatus: z.string().optional(),
+  restingHr: z.number().optional(),
+  sleepSec: z.number().optional(),
+  sleepScore: z.number().optional(),
+  weightKg: z.number().optional(),
+  bodyBattery: z.number().optional(),
+  stress: z.number().optional(),
+  readiness: z.number().optional(), // device training readiness 0–100
+  vo2max: z.number().optional(),
+  feel: z.number().int().min(1).max(5).optional(), // manual morning check-in
+  soreness: z.number().int().min(1).max(5).optional(),
+  note: z.string().optional(),
+});
+export type WellnessDay = z.infer<typeof WellnessDay>;
+
+// ───────────────────────────── athlete settings ─────────────────────────────
+
+export const THRESHOLD_KINDS = [
+  'ftp', // W, sport: bike
+  'run_threshold', // m/s threshold speed, sport: run
+  'swim_css', // m/s critical swim speed, sport: swim
+  'row_threshold', // W, sport: row
+  'lthr', // bpm, per sport or sport 'all'
+  'hr_max', // bpm
+  'hr_rest', // bpm
+  'weight', // kg
+] as const;
+export const ThresholdKind = z.enum(THRESHOLD_KINDS);
+export type ThresholdKind = z.infer<typeof ThresholdKind>;
+
+/** Effective-dated: a metric on date D uses the latest entry with effectiveFrom ≤ D. */
+export const Threshold = z.object({
+  id: z.string(),
+  kind: ThresholdKind,
+  sport: z.union([Sport, z.literal('all')]),
+  value: z.number().positive(),
+  effectiveFrom: LocalDate,
+  source: z.enum(['manual', 'garmin', 'estimated']),
+  note: z.string().optional(),
+});
+export type Threshold = z.infer<typeof Threshold>;
+
+/** UI accent options (DESIGN_V2 §2). */
+export const ACCENTS = ['blue', 'green', 'rose'] as const;
+export const Accent = z.enum(ACCENTS);
+export type Accent = z.infer<typeof Accent>;
+
+/** Body-weight goal. Progress is measured from startKg on startDate. */
+export const WeightGoal = z.object({
+  targetKg: z.number().min(25).max(300),
+  targetDate: LocalDate.optional(),
+  startKg: z.number().min(25).max(300),
+  startDate: LocalDate,
+});
+export type WeightGoal = z.infer<typeof WeightGoal>;
+
+export const Settings = z.object({
+  name: z.string(),
+  sex: z.enum(['male', 'female', 'unspecified']),
+  birthYear: z.number().int().optional(),
+  units: z.enum(['metric', 'imperial']),
+  weekStart: z.enum(['monday', 'sunday']),
+  timezone: z.string(), // IANA
+  theme: z.enum(['dark', 'light', 'system']),
+  /** UI accent hue (<html data-accent>). Required in the type; stored settings without it are merged
+   *  over DEFAULT_SETTINGS by the Worker. Deliberately no `.default()`: zod 4 applies defaults inside
+   *  `.partial()`, so a PATCH without `accent` would silently reset it. */
+  accent: Accent,
+  density: z.enum(['comfortable', 'compact']),
+  reducedMotion: z.boolean(),
+  homeRoute: z.enum(['today', 'calendar']),
+  garminAutoPushDays: z.number().int().min(0).max(30), // push planned workouts this many days ahead
+  onboarded: z.boolean(),
+  /** Body-weight goal (optional). Progress is measured from startKg on startDate. */
+  weightGoal: WeightGoal.optional(),
+});
+export type Settings = z.infer<typeof Settings>;
+
+// ───────────────────────────── body weight ─────────────────────────────
+
+/** One day of the weight series: the logged value (if any) and the smoothed trend. */
+export const WeightPoint = z.object({
+  date: LocalDate,
+  weightKg: z.number().optional(),
+  trendKg: z.number(),
+});
+export type WeightPoint = z.infer<typeof WeightPoint>;
+
+export const WeightGoalProgress = WeightGoal.extend({
+  remainingKg: z.number(), // trend − target (positive = still to lose when losing)
+  progressPct: z.number(), // 0–100 of the way from startKg to targetKg, by trend
+  /** kg/week needed from today's trend to hit targetDate (undefined without a date or once past it). */
+  requiredRatePerWeekKg: z.number().optional(),
+  /** When the current 28-day rate reaches the target (undefined if moving the wrong way / flat). */
+  projectedDate: LocalDate.optional(),
+  status: z.enum(['reached', 'on_track', 'behind', 'wrong_direction', 'no_data']),
+});
+export type WeightGoalProgress = z.infer<typeof WeightGoalProgress>;
+
+export const WeightSummary = z.object({
+  today: LocalDate,
+  from: LocalDate,
+  to: LocalDate,
+  latest: z.object({ date: LocalDate, weightKg: z.number() }).optional(),
+  trendKg: z.number().optional(),
+  change7dKg: z.number().optional(), // trend change over 7 days
+  change28dKg: z.number().optional(),
+  /** Least-squares slope of the trend over the last 28 days, kg per week (negative = losing). */
+  ratePerWeekKg: z.number().optional(),
+  entries: z.number().int(), // logged days in range
+  series: z.array(WeightPoint),
+  goal: WeightGoalProgress.optional(),
+});
+export type WeightSummary = z.infer<typeof WeightSummary>;
+
+export const DEFAULT_SETTINGS: Settings = {
+  name: '',
+  sex: 'unspecified',
+  units: 'metric',
+  weekStart: 'monday',
+  timezone: 'UTC',
+  theme: 'dark',
+  accent: 'blue',
+  density: 'comfortable',
+  reducedMotion: false,
+  homeRoute: 'calendar',
+  garminAutoPushDays: 7,
+  onboarded: false,
+};
+
+// ───────────────────────────── aggregates served by the API ─────────────────────────────
+
+export const FORM_ZONES = ['transition', 'fresh', 'neutral', 'productive', 'overreaching'] as const;
+export const FormZone = z.enum(FORM_ZONES);
+export type FormZone = z.infer<typeof FormZone>;
+
+/** One day of the fitness model. `projected` days use planned load. */
+export const FitnessDay = z.object({
+  date: LocalDate,
+  load: z.number(), // completed load that day
+  plannedLoad: z.number(), // planned (unpaired remaining) load that day
+  fitness: z.number(), // 42-day EWMA (end of day)
+  fatigue: z.number(), // 7-day EWMA (end of day)
+  form: z.number(), // yesterday's fitness − fatigue
+  formPct: z.number().nullable(), // form as PERCENT of fitness (−24 = −24 %)
+  formZone: FormZone.nullable(),
+  ramp: z.number().nullable(), // fitness − fitness 7 days earlier
+  projected: z.boolean(),
+});
+export type FitnessDay = z.infer<typeof FitnessDay>;
+
+export const SportTotals = z.object({
+  sport: Sport,
+  plannedSec: z.number(),
+  doneSec: z.number(),
+  plannedLoad: z.number(),
+  doneLoad: z.number(),
+  plannedDistanceM: z.number(),
+  doneDistanceM: z.number(),
+  plannedCount: z.number().int(),
+  doneCount: z.number().int(),
+  elevationGainM: z.number(),
+});
+export type SportTotals = z.infer<typeof SportTotals>;
+
+/** WoW delta as a fraction (0.08 = +8 %); null when the previous week is zero. */
+export const WeekSummary = z.object({
+  isoWeek: IsoWeek,
+  startDate: LocalDate,
+  endDate: LocalDate,
+  plannedSec: z.number(),
+  doneSec: z.number(),
+  plannedLoad: z.number(),
+  doneLoad: z.number(),
+  plannedDistanceM: z.number(),
+  doneDistanceM: z.number(),
+  elevationGainM: z.number(),
+  /** Done so far + still-planned remainder (current/future weeks). */
+  projectedSec: z.number(),
+  projectedLoad: z.number(),
+  targetHours: z.number().optional(),
+  targetLoad: z.number().optional(),
+  bySport: z.array(SportTotals),
+  keyPlanned: z.number().int(),
+  keyDone: z.number().int(),
+  /** Seconds of done time by intensity bucket. */
+  intensitySec: z.object({ easy: z.number(), moderate: z.number(), hard: z.number() }),
+  /** Mean clamped compliance over past planned workouts in PERCENT (0–100), null when none. */
+  compliancePct: z.number().nullable(),
+  fitness: z.number(), // at week end (projected for current/future)
+  fatigue: z.number(),
+  form: z.number(),
+  formPct: z.number().nullable(), // percent
+  formZone: FormZone.nullable(),
+  fitnessDelta: z.number(), // vs previous week end
+  wowSec: z.number().nullable(),
+  wowLoad: z.number().nullable(),
+  wowDistanceM: z.number().nullable(),
+  isProjected: z.boolean(), // week ends in the future
+  hasNote: z.boolean(),
+  phaseId: z.string().optional(),
+  /** Daily done load Mon..Sun for the summary sparkline. */
+  dailyLoad: z.array(z.number()).length(7),
+});
+export type WeekSummary = z.infer<typeof WeekSummary>;
+
+export const CalendarResponse = z.object({
+  from: LocalDate,
+  to: LocalDate,
+  today: LocalDate,
+  workouts: z.array(PlannedWorkout),
+  activities: z.array(Activity),
+  events: z.array(Event),
+  phases: z.array(Phase),
+  markers: z.array(DayMarker),
+  dayNotes: z.array(DayNote),
+  wellness: z.array(WellnessDay),
+  weeks: z.array(WeekSummary),
+});
+export type CalendarResponse = z.infer<typeof CalendarResponse>;
+
+export const SyncLogEntry = z.object({
+  id: z.string(),
+  at: IsoInstant,
+  kind: z.enum(['pull_activities', 'pull_wellness', 'push_workout', 'backfill', 'auth', 'recompute']),
+  status: z.enum(['ok', 'error', 'running']),
+  summary: z.string(),
+  detail: z.string().optional(),
+  durationMs: z.number().optional(),
+});
+export type SyncLogEntry = z.infer<typeof SyncLogEntry>;
+
+export const GarminStatus = z.object({
+  connected: z.boolean(),
+  displayName: z.string().optional(),
+  lastSyncAt: IsoInstant.optional(),
+  lastError: z.string().optional(),
+  state: z.enum(['disconnected', 'needs_mfa', 'connected', 'error']),
+  backfill: z
+    .object({ running: z.boolean(), done: z.number(), total: z.number().nullable(), oldestDate: LocalDate.optional() })
+    .optional(),
+});
+export type GarminStatus = z.infer<typeof GarminStatus>;
+
+// ───────────────────────────── native clients (docs/MOBILE_API.md) ─────────────────────────────
+
+/** `agent` = an AI agent using the MCP endpoint (docs/MCP.md). */
+export const DEVICE_PLATFORMS = ['ios', 'other', 'agent'] as const;
+export const DevicePlatform = z.enum(DEVICE_PLATFORMS);
+export type DevicePlatform = z.infer<typeof DevicePlatform>;
+
+/**
+ * A native client or AI agent holding a revocable bearer token (`cad_…`; only its SHA-256 hash is
+ * stored). Tokens from the passphrase API and from OAuth (MCP) both expire 30 days after sign-in.
+ */
+export const Device = z.object({
+  id: z.string(), // "dev_…"
+  name: z.string().min(1).max(64),
+  platform: DevicePlatform,
+  createdAt: IsoInstant,
+  lastUsedAt: IsoInstant.nullable(), // updated at most once per hour
+  expiresAt: IsoInstant, // the token stops working at this instant; sign in again for a new one
+  /** Short fingerprint of the token's stored hash (the token itself is never stored or shown again). */
+  fingerprint: z.string().optional(),
+  /** How the token was issued: OAuth consent (MCP clients) or created with the passphrase. */
+  connectedVia: z.enum(['oauth', 'passphrase']).optional(),
+});
+export type Device = z.infer<typeof Device>;
+
+/** One row of a widget's session list: a planned workout, a completed activity, or both (paired). */
+export const SnapshotSession = z.object({
+  id: z.string(), // workout id for planned/paired, activity id for activity
+  kind: z.enum(['planned', 'activity', 'paired']),
+  sport: Sport,
+  title: z.string(),
+  startTime: z.string().regex(/^\d{2}:\d{2}$/).nullable(), // local "HH:MM", planned or actual
+  durationSec: z.number().nonnegative().nullable(), // actual (moving, else elapsed) when done, else planned
+  distanceM: z.number().nonnegative().nullable(),
+  load: z.number().nonnegative().nullable(),
+  isKey: z.boolean(),
+  intensity: IntensityClass.nullable(),
+  state: z.enum(['planned', 'done', 'missed', 'skipped']),
+  workoutId: z.string().nullable(),
+  activityId: z.string().nullable(),
+});
+export type SnapshotSession = z.infer<typeof SnapshotSession>;
+
+export const SNAPSHOT_DAY_STATES = ['rest', 'planned', 'done', 'partial', 'missed'] as const;
+
+/** `GET /api/mobile/snapshot`: everything the widgets and the app's first paint need, in one response. */
+export const MobileSnapshot = z.object({
+  generatedAt: IsoInstant,
+  today: LocalDate,
+  units: z.enum(['metric', 'imperial']),
+  athleteName: z.string().nullable(),
+  status: z.object({
+    fitness: z.number().nullable(),
+    fatigue: z.number().nullable(),
+    form: z.number().nullable(),
+    formZone: FormZone.nullable(),
+    rampPerWeek: z.number().nullable(),
+    headline: z.string(),
+  }),
+  todaySessions: z.array(SnapshotSession),
+  tomorrowSessions: z.array(SnapshotSession),
+  week: z.object({
+    isoWeek: IsoWeek,
+    label: z.string(),
+    phase: z.string().nullable(),
+    doneSec: z.number(),
+    plannedSec: z.number(),
+    doneLoad: z.number(),
+    plannedLoad: z.number(),
+    keyDone: z.number().int(),
+    keyPlanned: z.number().int(),
+    days: z
+      .array(z.object({ date: LocalDate, plannedSec: z.number(), doneSec: z.number(), state: z.enum(SNAPSHOT_DAY_STATES) }))
+      .length(7),
+  }),
+  nextEvent: z
+    .object({ id: z.string(), name: z.string(), date: LocalDate, daysTo: z.number().int(), priority: z.enum(['A', 'B', 'C']) })
+    .nullable(),
+  fitnessSeries: z.array(z.object({ date: LocalDate, fitness: z.number(), fatigue: z.number(), form: z.number() })),
+  recentWeeks: z.array(z.object({ isoWeek: IsoWeek, label: z.string(), hours: z.number(), load: z.number() })),
+  lastActivity: SnapshotSession.nullable(),
+  lastSyncAt: IsoInstant.nullable(),
+});
+export type MobileSnapshot = z.infer<typeof MobileSnapshot>;

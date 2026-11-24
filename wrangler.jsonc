@@ -1,0 +1,30 @@
+{
+  "$schema": "apps/web/node_modules/wrangler/config-schema.json",
+  "name": "hermes",
+  "main": "apps/web/worker/index.ts",
+  "compatibility_date": "2026-11-15",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/mcp", "/.well-known/oauth-*", "/oauth/*"]
+  },
+  "observability": { "enabled": true },
+  "upload_source_maps": true,
+  // Garmin sync: incremental pull, wellness, auto-push, one backfill step.
+  "triggers": { "crons": ["*/30 * * * *"] },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      // No database id on purpose: `wrangler deploy` (and the Deploy to Cloudflare button) finds
+      // the database by name or creates it. An existing deployment keeps its own config in
+      // wrangler.personal.jsonc (gitignored), which the scripts prefer when present.
+      "database_name": "hermes",
+      "migrations_dir": "apps/web/migrations"
+    }
+  ],
+  "vars": {
+    // "1" serves the built-in synthetic Garmin account (demo + tests). Leave "0" in production.
+    "DEMO_MODE": "0"
+  }
+  // Secrets (wrangler secret put / .dev.vars, see .dev.vars.example): SESSION_SECRET, ENCRYPTION_KEY
+}

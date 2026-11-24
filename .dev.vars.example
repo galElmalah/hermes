@@ -1,0 +1,10 @@
+# Secrets for the Worker. The Deploy to Cloudflare button asks for these; for local development copy
+# this file to .dev.vars. Generate each value with: openssl rand -base64 32
+#
+# Signs session cookies. Changing it signs everyone out.
+SESSION_SECRET=replace-with-a-long-random-string
+# Encrypts the stored Garmin credentials (AES-GCM). Changing it means reconnecting Garmin.
+ENCRYPTION_KEY=replace-with-another-long-random-string
+#
+# Local development only: serve the built-in synthetic Garmin athlete. Never set this in production.
+# DEMO_MODE=1

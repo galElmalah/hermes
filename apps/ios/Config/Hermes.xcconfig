@@ -1,0 +1,52 @@
+// Hermes iOS — signing and identifiers for both targets (app + widget extension), their Info.plists
+// and their entitlements (read by project.yml). After changing anything: `xcodegen`.
+//
+// Don't edit the values here for your own build: put overrides in Config/Local.xcconfig
+// (gitignored, included at the end of this file), e.g.
+//
+//   HERMES_TEAM_ID = ABCDE12345
+//   HERMES_BUNDLE_ID = com.yourname.hermes
+//   HERMES_APP_GROUP = group.com.yourname.hermes
+//   HERMES_KEYCHAIN_GROUP = com.yourname.hermes.shared
+
+// Your Apple Developer team ID (Xcode → Settings → Accounts, or developer.apple.com → Membership).
+// Leave empty to sign "to run locally" in the simulator only.
+HERMES_TEAM_ID =
+
+// Bundle identifier of the app. The widget extension is $(HERMES_BUNDLE_ID).widgets.
+HERMES_BUNDLE_ID = com.example.hermes
+
+// App Group shared by the app and the widget extension (snapshot cache + shared preferences).
+// Must start with "group." and be registered for both bundle ids (Xcode does this automatically
+// with automatic signing when the team is set).
+HERMES_APP_GROUP = group.com.example.hermes
+
+// Keychain access group for the device token (without the team prefix; Xcode prepends
+// $(AppIdentifierPrefix)). Both targets list it under keychain-access-groups.
+HERMES_KEYCHAIN_GROUP = com.example.hermes.shared
+
+// Optional default server address, pre-filled on the connect screen (Info.plist HermesServerURL →
+// CadenceKit.ServerConfig). Everyone enters their own server on first launch; the app remembers
+// it. Leave empty for shared builds (TestFlight). `//` starts a comment in xcconfig, hence
+// `https:/$()/` if you set one.
+// Debug builds can override it for a local server: launch argument -HermesDebugServerURL <url>
+// (Shared/HermesServer.swift; compiled out of Release).
+HERMES_SERVER_URL =
+
+// Version shown in Settings and sent as X-Cadence-Client: ios/<version>.
+MARKETING_VERSION = 0.1.0
+CURRENT_PROJECT_VERSION = 3
+
+// Provisioning profile names for a manually signed App Store / TestFlight build. Leave empty for
+// automatic signing; a distribution archive passes them on the xcodebuild command line together
+// with CODE_SIGN_STYLE=Manual.
+HERMES_APP_PROFILE =
+HERMES_WIDGETS_PROFILE =
+
+DEVELOPMENT_TEAM = $(HERMES_TEAM_ID)
+CODE_SIGN_STYLE = Automatic
+IPHONEOS_DEPLOYMENT_TARGET = 17.0
+SWIFT_VERSION = 5.0
+
+// Personal overrides (optional, gitignored).
+#include? "Local.xcconfig"

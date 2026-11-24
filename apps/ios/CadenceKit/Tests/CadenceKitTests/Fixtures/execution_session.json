@@ -1,0 +1,11 @@
+{
+  "version": 1, "workoutId": "wk_session", "activityId": "act_session",
+  "method": "session", "confidence": "low",
+  "note": "Strength plan with reps only; judged on the session totals",
+  "score": 100, "state": "on_target",
+  "summary": "Session within 5% of the planned duration",
+  "counts": { "planned": 0, "onTarget": 0, "over": 0, "under": 0, "skipped": 0, "extra": 0 },
+  "planned": { "durationSec": 2700, "distanceM": null, "load": 40 },
+  "actual": { "durationSec": 2760, "distanceM": null, "load": 42 },
+  "steps": []
+}

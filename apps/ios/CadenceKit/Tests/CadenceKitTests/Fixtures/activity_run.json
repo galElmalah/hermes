@@ -1,0 +1,374 @@
+{
+ "id": "act_j0oj4dkl7h",
+ "source": "garmin",
+ "garminActivityId": "20378916683",
+ "garminTypeKey": "running",
+ "startedAt": "2026-11-15T07:52:50.000Z",
+ "utcOffsetMin": 60,
+ "localDate": "2026-11-15",
+ "sport": "run",
+ "subSport": "road_run",
+ "title": "Long run w/ 3×10′ steady",
+ "durationSec": 5117,
+ "movingSec": 5105,
+ "distanceM": 16904.2,
+ "elevationGainM": 97,
+ "load": 99.5,
+ "loadSource": "pace",
+ "intensityFactor": 0.838,
+ "avgHr": 157,
+ "maxHr": 174,
+ "avgSpeedMps": 3.311,
+ "adjustedSpeedMps": 3.377,
+ "avgCadence": 175,
+ "calories": 1253,
+ "efficiency": 1.293,
+ "decouplingPct": 6.05,
+ "aerobicEffect": 3.5,
+ "anaerobicEffect": 1.1,
+ "intensityAuto": "tempo",
+ "intensity": "tempo",
+ "isKey": true,
+ "rpe": 6,
+ "feel": 4,
+ "postNote": "Long run done. Hips tight last 3k.",
+ "tags": [],
+ "pairedWorkoutId": "wk_d20261115_1",
+ "hasStreams": true,
+ "sparkline": [
+  0.78,
+  0.78,
+  0.77,
+  0.77,
+  0.77,
+  0.79,
+  0.81,
+  0.84,
+  0.85,
+  0.85,
+  0.83,
+  0.79
+ ],
+ "locationName": "Girona",
+ "createdAt": "2026-11-22T10:48:14.195Z",
+ "updatedAt": "2026-11-22T10:48:14.246Z",
+ "compliance": {
+  "metric": "load",
+  "ratio": 1.25,
+  "state": "partial_long"
+ },
+ "laps": [
+  {
+   "index": 0,
+   "startSec": 0,
+   "durationSec": 2160,
+   "movingSec": 2160,
+   "distanceM": 6999.7,
+   "avgHr": 152,
+   "maxHr": 158,
+   "avgSpeedMps": 3.241,
+   "avgCadence": 176,
+   "elevationGainM": 50,
+   "maxSpeedMps": 3.95,
+   "maxCadence": 180,
+   "elevationLossM": 31,
+   "avgTempC": 10,
+   "avgGroundContactMs": 254,
+   "avgVerticalOscillationCm": 8.7,
+   "avgVerticalRatioPct": 7.81,
+   "avgStrideLengthM": 1.11
+  },
+  {
+   "index": 1,
+   "startSec": 2160,
+   "durationSec": 600,
+   "movingSec": 600,
+   "distanceM": 2301.1,
+   "avgHr": 168,
+   "maxHr": 174,
+   "avgSpeedMps": 3.835,
+   "avgCadence": 180,
+   "elevationGainM": 10,
+   "maxSpeedMps": 4.333,
+   "maxCadence": 186,
+   "elevationLossM": 15,
+   "avgTempC": 11,
+   "avgGroundContactMs": 234,
+   "avgVerticalOscillationCm": 8.9,
+   "avgVerticalRatioPct": 6.92,
+   "avgStrideLengthM": 1.28
+  }
+ ],
+ "zones": {
+  "pace": [
+   {
+    "zone": 1,
+    "name": "Recovery",
+    "low": null,
+    "high": 3.125581395348837,
+    "seconds": 1154
+   },
+   {
+    "zone": 2,
+    "name": "Aerobic",
+    "low": 3.125581395348837,
+    "high": 3.5368421052631582,
+    "seconds": 2353
+   }
+  ],
+  "hr": [
+   {
+    "zone": 1,
+    "name": "Recovery",
+    "low": null,
+    "high": 144.5,
+    "seconds": 186
+   },
+   {
+    "zone": 2,
+    "name": "Aerobic",
+    "low": 144.5,
+    "high": 153,
+    "seconds": 1690
+   }
+  ]
+ },
+ "peaks": {
+  "hr": [
+   {
+    "durationSec": 1,
+    "value": 174,
+    "startSec": 2685
+   },
+   {
+    "durationSec": 2,
+    "value": 174,
+    "startSec": 2692
+   }
+  ],
+  "speed": [
+   {
+    "durationSec": 1,
+    "value": 4.38,
+    "startSec": 3389
+   },
+   {
+    "durationSec": 2,
+    "value": 4.345,
+    "startSec": 3332
+   }
+  ],
+  "efforts": [
+   {
+    "distanceM": 400,
+    "timeSec": 96.5,
+    "startSec": 3318
+   },
+   {
+    "distanceM": 1000,
+    "timeSec": 243.1,
+    "startSec": 3245
+   }
+  ]
+ },
+ "thresholdsUsed": {
+  "ftp": 276,
+  "runThresholdMps": 4.032,
+  "swimCssMps": 0.99,
+  "rowThresholdW": 241,
+  "lthr": 170,
+  "hrMax": 187,
+  "hrRest": 47,
+  "weightKg": 71.8
+ },
+ "facts": {
+  "startLat": 41.9794,
+  "startLng": 2.8214,
+  "elevationLossM": 97,
+  "minAltitudeM": 60.5,
+  "maxAltitudeM": 101.3,
+  "deviceLoad": 110,
+  "trainingEffectLabel": "TEMPO",
+  "endLat": 41.979753,
+  "endLng": 2.817784,
+  "timerSec": 5117,
+  "maxSpeedMps": 4.381,
+  "maxCadence": 184,
+  "avgGroundContactMs": 252,
+  "avgGroundContactBalanceLeftPct": 49.5,
+  "avgVerticalOscillationCm": 8.7,
+  "avgVerticalRatioPct": 7.7,
+  "avgStrideLengthM": 1.14,
+  "steps": 14890,
+  "avgTempC": 11,
+  "minTempC": 10,
+  "maxTempC": 11,
+  "sportProfile": "Run",
+  "deviceName": "Forerunner 965",
+  "deviceSoftware": "25.24",
+  "sensors": [
+   {
+    "kind": "Heart rate",
+    "name": "HRM-Pro"
+   }
+  ],
+  "pausedSec": 12,
+  "maxGradePct": 2.9,
+  "minGradePct": -2.9,
+  "minHr": 90
+ },
+ "plannedWorkout": {
+  "id": "wk_d20261115_1",
+  "date": "2026-11-15",
+  "startTime": "09:00",
+  "sport": "run",
+  "subSport": "road_run",
+  "title": "Long run w/ 3×10′ steady",
+  "description": "Greenway out-and-back. Gel at 45′.",
+  "plannedDurationSec": 5100,
+  "plannedDistanceM": 15135,
+  "plannedLoad": 79.3,
+  "plannedIntensityFactor": 0.748,
+  "structure": {
+   "steps": [
+    {
+     "kind": "step",
+     "id": "s1",
+     "role": "active",
+     "measure": {
+      "type": "time",
+      "sec": 2160
+     },
+     "target": {
+      "type": "hr_zone",
+      "zone": 2
+     },
+     "label": "Easy"
+    },
+    {
+     "kind": "repeat",
+     "id": "s4",
+     "count": 3,
+     "steps": [
+      {
+       "kind": "step",
+       "id": "s2",
+       "role": "active",
+       "measure": {
+        "type": "time",
+        "sec": 600
+       },
+       "target": {
+        "type": "pace_pct",
+        "low": 88,
+        "high": 92
+       },
+       "label": "Steady"
+      },
+      {
+       "kind": "step",
+       "id": "s3",
+       "role": "recovery",
+       "measure": {
+        "type": "time",
+        "sec": 180
+       },
+       "target": {
+        "type": "pace_pct",
+        "low": 70,
+        "high": 78
+       }
+      }
+     ]
+    }
+   ]
+  },
+  "isKey": true,
+  "intensity": "tempo",
+  "tags": [
+   "long"
+  ],
+  "environment": "outdoor",
+  "pairedActivityId": "act_j0oj4dkl7h",
+  "status": "planned",
+  "sparkline": [
+   0.55,
+   0.55,
+   0.55,
+   0.55,
+   0.55,
+   0.55,
+   0.55,
+   0.55,
+   0.55,
+   0.55,
+   0.55,
+   0.55
+  ],
+  "garmin": {
+   "syncState": "none"
+  },
+  "createdAt": "2026-11-22T10:48:09.264Z",
+  "updatedAt": "2026-11-22T10:48:14.246Z",
+  "compliance": {
+   "metric": "load",
+   "ratio": 1.25,
+   "state": "partial_long"
+  }
+ },
+ "previousSimilar": {
+  "id": "act_szaha8xemy",
+  "source": "garmin",
+  "garminActivityId": "20369258551",
+  "garminTypeKey": "running",
+  "startedAt": "2026-10-18T09:10:37.000Z",
+  "utcOffsetMin": 120,
+  "localDate": "2026-10-18",
+  "sport": "run",
+  "subSport": "road_run",
+  "title": "Costa Brava Half — Run 21.1k",
+  "durationSec": 5965,
+  "movingSec": 5965,
+  "distanceM": 21079.7,
+  "elevationGainM": 43,
+  "load": 127.6,
+  "loadSource": "pace",
+  "intensityFactor": 0.877,
+  "avgHr": 160,
+  "maxHr": 169,
+  "avgSpeedMps": 3.534,
+  "adjustedSpeedMps": 3.538,
+  "avgCadence": 177,
+  "calories": 1559,
+  "efficiency": 1.3239,
+  "decouplingPct": 4.66,
+  "aerobicEffect": 4,
+  "anaerobicEffect": 0.4,
+  "intensityAuto": "tempo",
+  "intensity": "tempo",
+  "isKey": true,
+  "rpe": 9,
+  "feel": 5,
+  "postNote": "FINISHED 4:48:47! Run fell apart a bit after 15k but held 4:43/km. Sub-5 ✔",
+  "tags": [],
+  "pairedWorkoutId": "wk_d20261018_3",
+  "hasStreams": true,
+  "sparkline": [
+   0.94,
+   0.94,
+   0.96,
+   0.98,
+   1,
+   0.99,
+   0.96,
+   0.94,
+   0.94,
+   0.95,
+   0.96,
+   0.95
+  ],
+  "locationName": "Castell-Platja d'Aro",
+  "createdAt": "2026-11-22T10:48:30.811Z",
+  "updatedAt": "2026-11-22T10:48:30.902Z"
+ }
+}

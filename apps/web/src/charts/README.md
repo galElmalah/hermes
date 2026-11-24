@@ -1,0 +1,182 @@
+# Chart kit (`@/charts`)
+
+Hand-rolled SVG + d3 math + Motion, Canvas 2D for 1 Hz streams. v2.1 look (`docs/DESIGN_V2.md`
+§5 "Charts" + §8 "Colour for data"): quiet neutral chrome, and **colour that carries data meaning** in
+fixed vocabularies — sport, zone, status, series, metric (below). Every chart: typed domain props,
+responsive (ResizeObserver), loading skeleton at the final size, empty state, keyboard navigation, an
+sr-only summary + data table, reduced-motion support.
+
+Import everything from the barrel: `import { FitnessChart, WeeklyBars, … } from '@/charts';`
+Live catalogue: `/dev/charts` (or `/charts-gallery.html` standalone). Mock data: `@/charts/mock`.
+
+## Rules you get for free (don't re-implement)
+
+- Colours are tokens only (`T.*` = `var(--color-…)`), so SVG charts follow `data-theme` and
+  `data-accent` with zero JS. Canvas reads the same tokens via `useCanvasTokens()`, which resolves
+  `var()` / `color-mix()` / relative-colour tokens through a probe element into colours a 2D
+  context accepts, and re-resolves (and redraws) when `data-theme`, `data-accent`, `class` or
+  `style` on `<html>` change.
+- **Colour by job (DESIGN_V2 §8).** Tokens: `T.series1..3`, `T.sport(s)`, `T.zone(n)`, `T.metric(k)`,
+  `T.good|warn|serious|critical` (SVG) and the same, resolved, on `useCanvasTokens()` (`series`,
+  `sports`, `zones`, `metrics`, `metricFade`, `good`…). Text never wears a data colour: values and
+  labels stay `fg-*`, a coloured mark (dot, line sample, swatch) sits beside them.
+  - **Series:** Fitness = `series-1` blue (2px + the only ≤ 12 % fade), Fatigue = `series-2` orange
+    1.25px, Form = `series-3` aqua 1.5px; projections dashed `2 4`. Any other multi-series chart takes
+    the three in that order; comparison / ghost series stay neutral (fg-3 / fg-4 dashed).
+  - **Sport:** stacks use `SPORT_RAMP` = the sport colours in the fixed palette order bike → run → swim
+    → walk → strength → hike → row → ski → other (yoga / unknown = neutral "Other"), 2px surface gaps
+    between stacked segments, a legend whenever ≥ 2 sports show. A sport keeps its colour everywhere
+    (route lines: `RouteMap sport=…`; one-sport bars: `WeeklyBars stack="total" totalColor={T.sport(s)}`).
+  - **Zones:** `z1` grey · `z2` blue · `z3` aqua · `z4` yellow · `z5` red · `z6` violet · `z7` magenta,
+    always paired with a label, height or position. `zoneFill(i, count)` maps an N-zone model (3-zone =
+    easy z2 · moderate z3 · hard z5); easy / moderate / hard splits use z2 / z3 / z5.
+  - **Per-metric stream colours (`METRIC_COLOR` in `core/tokens.ts`)** — the same in StreamChart,
+    curves, wellness, readouts and legends:
+
+    | Metric | Colour | Token |
+    |---|---|---|
+    | Power | blue | `series-1` |
+    | Heart rate (incl. resting HR) | red | `--c-red` |
+    | Pace / speed | aqua | `series-3` |
+    | Cadence | violet | `--c-violet` |
+    | Elevation | neutral area | `fg-4` line on `surface-2` |
+
+    The primary track (power when present) gets a ≤ 12 % fade in its own colour; zone shading uses
+    `z1..z7`. `PowerCurve` primary = blue, `PaceCurve` primary = aqua (`primaryTone`), comparisons neutral.
+  - **Status:** caution / ramp warnings = `warn` (+ ⚠ glyph, ink label), risky ramp = `serious`. Never
+    for a series.
+  - **One hue:** `ConsistencyHeatmap` = accent tints (16 → 85 %) at load quartiles. `StatBar` = neutral
+    track + `fg` / `accent` / status fill, or `color` / `segments` (e.g. hours by sport).
+- Deltas: arrow + sign + weight (`DeltaBadge`); the arrow turns `good` / `warn` only when the caller
+  says the direction is good (`good`) or bad (`bad`).
+- Data-ink: ≤ 3 horizontal `line-1` gridlines (`linearTicks` defaults to 3) plus a `line-2`
+  baseline, no vertical grid, no axis lines or tick marks, fewer tick labels (`thinTicks` keeps
+  ≥ 20px between labels, `dateTicks` ≈ one per 96px).
+- Direct end-of-line labels instead of legends (collision-avoided, ≥ 16px apart; names only where
+  the value is in a header). Legends only for > 3 series (WeeklyBars sports). Under 480px end
+  labels move into a row above the plot.
+- All chart text is the UI sans, 12px (`TXT` in `core/tokens.ts`), sentence case, `fg-3`; values
+  `fg-1`/`fg-2` with tabular figures; U+2212 minus (`fmtNum`, `fmtSigned`, `fmtPct`). `T.mono` is a
+  deprecated alias of the sans. No uppercase, no tracking.
+- Annotations are quiet: today = thin fg-4 rule + "Today"; events = dotted fg-4 rule + small dot
+  (A-races fg-1 + 500); phase bands = 1.8 % washes, no edge lines; selection / brush = a soft
+  neutral wash without edge lines. Tooltips are one surface step (`surface-3`), no border.
+- Motion: timing comes from `src/motion/tokens.ts` (re-exported by `charts/motion.ts`). Lines draw
+  in with a clip reveal, areas fade 80 ms later, bars grow with a 12 ms stagger, range/metric
+  changes morph (domain springs or `d3-interpolate-path`). Reduced motion → 120 ms fades / jumps.
+- **Values at the pointer, inside the plot.** Every crosshair chart shows its numbers next to the
+  cursor / finger, not only in a readout row above the plot (which can be scrolled off-screen on a
+  phone): `ChartTooltip anchor={useChartPointer().anchor} boundsRef={svgRef}` sits beside the rule
+  at the pointer's height (above and beside the finger on touch), flips sides at the plot edges and
+  clamps vertically (`placeLabel` in `core/placeLabel.ts`); StreamChart writes one opaque label per
+  track imperatively (the touched track also carries time · distance). Labels are `surface-3`,
+  no border/shadow, `label` size, values `fg-1` tabular, units/positions `fg-3`.
+- **Touch:** interactive surfaces are `touch-action: pan-y` — vertical drags scroll the page
+  (the browser sends `pointercancel`, which clears the crosshair), sideways drags scrub, a tap
+  inspects (kept after lifting). `useChartPointer` handles this for SVG charts; StreamChart adds
+  long-press-then-drag to select and two-finger pinch to zoom.
+- Hover never calls `setState` per frame on the chart: hover lives in a `HoverSync` store (only the
+  overlay re-renders) or, for streams, in a `MotionValue` (no React at all).
+
+Prefer `StatBar` over `FormDial` / `Gauge` / `ProgressRing` in new UI (research rule 12: length beats angle).
+
+**Set `--chart-bg` on the card a chart sits on** (`style={{ '--chart-bg': 'var(--color-surface-1)' }}`)
+so crosshair-dot rings and line halos match the surface. Defaults to `--color-canvas`.
+
+## Catalogue
+
+| Component | Data | Key props |
+|---|---|---|
+| `FitnessChart` | `FitnessDay[]` (incl. `projected` days) | `today?`, `range? / defaultRange? / onRangeChange?` (`'6w'·'12w'·'6m'·'1y'·'all'`), `events?: ChartEvent[]` (races always named; tests/notes become bare markers when > 4 are in view, names in the tooltip), `phases?: ChartPhase[]`, `showLoad=true` (faint), `showRamp=false`, `showFormZones=false`, `showHeader=true`, `showEndLabels=true`, `projectionDays=42`, `height=220`, `formHeight=96`, `formBands?`, `sync?: HoverSync<LocalDate>`, `onDayClick?(date)`, `onSelect?(FitnessSelection \| null)` |
+| `WeeklyBars` | `WeekSummary[]` | `metric? / defaultMetric='hours' / onMetricChange?` (`'hours'·'load'·'distance'`), `stack='sport' \| 'total'`, `showPlanned=true`, `showRollingAvg=true`, `showWow=false`, `showTargets=false`, `showLegend=true`, `cautionAbove=0.15`, `height=240`, `sync?: HoverSync<IsoWeek>`, `onWeekClick?(isoWeek)`. WoW and target are always in the tooltip |
+| `WowDeltaBars` | `WowItem[]` (`wowItems(weeks, metric)`) | `cautionAbove=0.15`, `maxAbs=0.6`, `height=150`, `onItemClick?`, `sync?`. Value labels thin out with bar width (latest + caution weeks first, no overlaps) |
+| `compareWeeks(weeks, 'week' \| '4v4')` | `WeekSummary[]` | → `CompareTile[]` for the 6 WoW tiles (hours, load, fitness, form, key, compliance) |
+| `IntensityDistribution` | `IntensitySplit[]` (`weeksToSplits(weeks)`) | `target={easy:.8,moderate:.05,hard:.15} \| null`, `height=160`, `onItemClick?`; header shows `classifyIntensity()` |
+| `ZoneBars` | `ZoneTime[]` | `targetPct?: (number\|null)[]`, `unit?`, `formatRange?`, `compact?` |
+| `PowerCurve` / `PaceCurve` / `EffortCurve` | `CurveSeries[]` = `{ id, label, points: PeakPoint[], variant: 'primary'\|'secondary'\|'comparison' }` | Power: `weightKg?` (W/kg), `model?: {cp, wPrime}`, `markers=[5,60,300,1200,3600]` (small dots), `showMarkerLabels=false`. Pace: points are **speed m/s**, `per=1000\|100\|500`; `effortsToPoints(BestEffort[])` converts. `sync?: HoverSync<number>` (seconds), `focusSec=1200` |
+| `StreamChart` | `ActivityStreams` (+ `Lap[]`) | `tracks?` (`power·hr·speed·cadence·altitude`), `sport` (run/swim/row → pace), `ftp?` (enables Zones shading), `xAxis/smoothing/zoneShading` (controlled or `default*`), `cursor?: MotionValue<number>`, `selection? / onSelect?({startSec,endSec} \| null)`, `trackHeight=72`, `showControls` |
+| `streamStats(streams, startSec, endSec)` | `ActivityStreams` | → duration, distance, avg/max/weighted power, avg/max HR, speed, cadence, gain |
+| `RouteMap` | `ActivityStreams` (`t`, `lat`, `lng`, `altitude?`, `distance?`) | `cursor?: MotionValue<number> \| number \| null`, `selection?`, `onHoverSec?`, `elevationShading`, `kmMarkers=true` (≤ 6), `height=340`. No graticule or compass |
+| `IntensityProfile` | `ProfileBlock[]` = `{ id, startSec, durationSec, intensity (1 = 100 % threshold), intensityEnd?, level?, role, label? }` | `repeats?: {id,startSec,endSec,count}[]`, `variant='full'\|'compact'`, `height` (24 card / 48 detail / 160 builder), `selectedId? / onSelect?`, `hoveredId? / onHover?`, `maxIntensity=1.5` |
+| `ConsistencyHeatmap` | `HeatDay[]` = `{ date, load, sessions?, key?, missed? }` | `today`, `weeks=52`, `onDayClick?`, `showStreaks`, `sync?`; `computeStreaks()` exported |
+| `WellnessChart` | `WellnessDay[]` | `metrics=['hrv','rhr','sleep','weight']`, `loads?: {date,load}[]`, `baselineDays=60`, `rollingDays=7`, `panelHeight=84`, `sync?` |
+| `Sparkline` | `(number\|null)[]` | `width=64`, `height=20`, `tone='fg'\|'accent'` (default **fg**), `endDot`, `showValue`, `baseline?` |
+| `SparkBars` | `number[]` (e.g. `week.dailyLoad`) | `planned?: number[]` (remainder drawn as a surface step), `todayIndex?` (that bar is accent, the rest fg-3), `barWidth=4`, `gap=2`, `height=20` |
+| `MiniArea` | `(number\|null)[]` | `width?` (omit = fill parent), `height=32`, `tone='fg'` (default **fg**) |
+| `SportMixBar` / `SplitBar` | `{sport,value}[]` / `{easy,moderate,hard}` | 100 % bars for the week-summary column |
+| `StatBar` | `label`, `value`, `max` | `min=0`, `format?`, `unit?`, `caption?`, `marker?`, `tone='fg'\|'accent'`, `size='sm'\|'md'` — **the v2 alternative to dials and rings**: label, number, 4px bar, one line of context |
+| `FormDial` | `value`, `zone?` | `min=-45`, `max=35`, `size=200`, `caption?` — thin neutral track, the current zone as a small accent arc, a dot marker, no scale labels |
+| `Gauge` | `value` | `min=0`, `max=100`, `label`, `unit?`, `size=160` — 3px track + accent arc, no ticks |
+| `ProgressRing` | `done`, `planned` | `size=44`, `stroke=3`, `label?` (null hides) — overshoot draws a hairline fg-3 inner arc |
+| `CompareBars` | `{label, current, previous, format?, unit?, accent?}[]` | `currentLabel`, `previousLabel` — thin bars, current fg-2 (or accent), previous a surface step |
+
+Common: every chart takes `loading?` and `className?`; empty input renders the empty state.
+
+### Snippets
+
+```tsx
+// Trends overview
+<FitnessChart days={fitness} today={today} events={events} phases={phases} showRamp
+  range={search.range} onRangeChange={(range) => navigate({ search: { range } })} />
+<WeeklyBars weeks={weeks} onWeekClick={(w) => navigate({ to: '/week/$isoWeek', params: { isoWeek: w } })} />
+<IntensityDistribution items={weeksToSplits(weeks)} />
+<WowDeltaBars items={wowItems(weeks, 'load')} />
+<ConsistencyHeatmap days={heat} today={today} onDayClick={openDay} />
+
+// Calendar week-summary column (static, cheap)
+<SparkBars values={week.dailyLoad} planned={plannedDaily} todayIndex={isCurrent ? dow : undefined} />
+<SportMixBar segments={week.bySport.map((s) => ({ sport: s.sport, value: s.doneSec }))} />
+<SplitBar {...week.intensitySec} height={4} />
+<DeltaBadge value={week.wowLoad} flat={0.03} caution={(week.wowLoad ?? 0) > 0.15} />
+
+// Workout card / builder
+<IntensityProfile variant="compact" blocks={blocks} height={24} />
+<IntensityProfile blocks={blocks} repeats={repeats} selectedId={sel} onSelect={setSel} height={160} />
+```
+
+## Composing synced charts
+
+**Date charts** (FitnessChart, WellnessChart, ConsistencyHeatmap): share one `HoverSync<LocalDate>`.
+
+```tsx
+const daySync = useMemo(() => createHoverSync<LocalDate>(), []);
+<FitnessChart days={fitness} sync={daySync} />
+<WellnessChart days={wellness} sync={daySync} />   // crosshairs move together
+const hovered = useHoverValue(daySync);              // read it anywhere (re-renders only you)
+```
+WeeklyBars / WowDeltaBars / IntensityDistribution share `HoverSync<IsoWeek | string>` keyed by isoWeek.
+
+**Activity page** (StreamChart ↔ RouteMap ↔ laps table): one `MotionValue<number>` cursor in seconds
+(NaN = none) and one selection in state.
+
+```tsx
+const cursor = useStreamCursor();
+const [sel, setSel] = useState<StreamSelection | null>(null);
+<StreamChart streams={s} laps={laps} ftp={ftp} cursor={cursor} selection={sel} onSelect={setSel} />
+<RouteMap streams={s} cursor={cursor} selection={sel} />
+// lap row click → setSel({ startSec: lap.startSec, endSec: lap.startSec + lap.durationSec })
+// selection panel → streamStats(s, sel.startSec, sel.endSec)
+```
+Subscribe imperatively for anything per-frame: `useEffect(() => cursor.on('change', (sec) => …), [cursor])`.
+
+StreamChart gestures: drag = select · ⌘/Ctrl + wheel or pinch = zoom · Shift + wheel / drag the
+overview window = pan · double-click = reset · keys ←/→ (Shift ×10) cursor, `+`/`−` zoom, `Z` zoom to
+selection, `0` reset, `Esc` clear. Touch: sideways drag = scrub, vertical drag = page scroll, tap =
+inspect, long-press then drag = select, two fingers = pinch-zoom.
+
+## Building a bespoke chart
+
+Use the core: `useChartSize` (ResizeObserver), `ChartFrame` (a11y + skeleton + empty), `ChartDefs`
++ `useChartDefs()` (per-instance `hatchAccent`, `hatchFg`, `hatchFgDense`, `hatchOnAccent`, `dotsFg`,
+`dashesFg`, `fadeAccent`, `fadeFg`), `AxisX/AxisY/Grid` + `linearTicks/dateTicks/thinTicks`,
+`EndLabels` (+ `avoidCollisions`), `EventFlags/PhaseBands/TodayRule`, `ChartTooltip` +
+`TooltipBody` + `CrosshairRule/CrosshairDot`, `useChartPointer` (pointer, touch, arrow keys, live
+region; its `anchor` feeds `ChartTooltip`), `placeLabel` (beside-the-rule placement with edge flip), `useBrushX` + `mergeHandlers`, `MorphPath`, `Reveal`, `Ticker`, `lttbIndices` (gap-aware
+LTTB on Float64Array windows), `fitCanvas` (DPR) and `useCanvasTokens`.
+
+## Performance (measured in the gallery, Chromium, 1440px)
+
+- StreamChart, 9 000 × 5 tracks: scripted 240-step scrub median/p95 frame 16.7/16.7 ms (60 fps),
+  pointer handler 0.03 ms; zoom animation 60 fps. LTTB 5 tracks → 2 200 pts: 0.45 ms (9k) / 0.69 ms (18k).
+- FitnessChart range morph recomputes ≤ 10 paths per frame from spring-animated domain values
+  (~400 points each) — 60 fps on desktop.

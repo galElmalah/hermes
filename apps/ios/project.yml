@@ -1,0 +1,212 @@
+# XcodeGen spec for the Hermes iOS app + widget extension.
+#   brew install xcodegen && xcodegen && open Hermes.xcodeproj
+# Identifiers, team and App Group live in Config/Hermes.xcconfig (edit that file, not this one).
+# Info.plist and .entitlements files are generated from the `info` / `entitlements` blocks below.
+name: Hermes
+
+options:
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+  developmentLanguage: en
+  groupSortPosition: top
+
+configFiles:
+  Debug: Config/Hermes.xcconfig
+  Release: Config/Hermes.xcconfig
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    DEAD_CODE_STRIPPING: YES
+
+packages:
+  CadenceKit:
+    path: CadenceKit
+
+targets:
+  Hermes:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: App
+      - path: Shared
+    dependencies:
+      - package: CadenceKit
+      - target: HermesWidgets
+        embed: true
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: Hermes
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSRequiresIPhoneOS: true
+        UILaunchScreen: {}
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        CFBundleURLTypes:
+          - CFBundleURLName: $(PRODUCT_BUNDLE_IDENTIFIER)
+            CFBundleURLSchemes:
+              - hermes
+        # Read by CadenceKit.AppGroupConfig.fromInfoPlist()
+        HermesAppGroup: $(HERMES_APP_GROUP)
+        HermesKeychainGroup: $(AppIdentifierPrefix)$(HERMES_KEYCHAIN_GROUP)
+        # The one server (CadenceKit.ServerConfig / Shared/HermesServer.swift), from Config/Hermes.xcconfig.
+        HermesServerURL: $(HERMES_SERVER_URL)
+        # ATS: HTTPS everywhere. Debug builds may use a local development server (debug-only
+        # override, Shared/HermesServer.swift), so plain HTTP to local hosts is allowed there; the
+        # Release build strips both keys below (post-build script).
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        NSLocalNetworkUsageDescription: Debug builds of Hermes can connect to a development server on your local network.
+        ITSAppUsesNonExemptEncryption: false
+        # Background app refresh keeps the widget snapshot fresh (App/Core/BackgroundRefresh.swift).
+        UIBackgroundModes:
+          - fetch
+        BGTaskSchedulerPermittedIdentifiers:
+          - $(PRODUCT_BUNDLE_IDENTIFIER).refresh
+    entitlements:
+      path: App/Hermes.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - $(HERMES_APP_GROUP)
+        keychain-access-groups:
+          - $(AppIdentifierPrefix)$(HERMES_KEYCHAIN_GROUP)
+    postBuildScripts:
+      # Release only: drop the plain-HTTP local-network exception (only the debug-only development
+      # server override needs it). Runs before code signing. Needs the script sandbox off because it
+      # edits the processed Info.plist in place.
+      - name: Strip local-network ATS exception (Release)
+        basedOnDependencyAnalysis: false
+        script: |
+          if [ "${CONFIGURATION}" = "Release" ]; then
+            plist="${TARGET_BUILD_DIR}/${INFOPLIST_PATH}"
+            /usr/libexec/PlistBuddy -c "Delete :NSAppTransportSecurity" "$plist" 2>/dev/null || true
+            /usr/libexec/PlistBuddy -c "Delete :NSLocalNetworkUsageDescription" "$plist" 2>/dev/null || true
+          fi
+    settings:
+      base:
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
+        PRODUCT_BUNDLE_IDENTIFIER: $(HERMES_BUNDLE_ID)
+        PRODUCT_NAME: Hermes
+        # Empty with automatic signing; set for a manually signed distribution build (see Config/Hermes.xcconfig).
+        PROVISIONING_PROFILE_SPECIFIER: $(HERMES_APP_PROFILE)
+        TARGETED_DEVICE_FAMILY: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        ENABLE_PREVIEWS: YES
+        SWIFT_EMIT_LOC_STRINGS: YES
+
+  HermesWidgets:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: Widgets
+        excludes:
+          - "**/*.md"   # Widgets/README.md is documentation, not a bundle resource
+      # Shared (Theme, DataColor, components) and Shared/Intents (App Intents) are compiled into
+      # both targets; the AppShortcutsProvider is app-only (one per app bundle).
+      - path: Shared
+        excludes:
+          - "Intents/AppOnly/**"
+    dependencies:
+      - package: CadenceKit
+      - sdk: WidgetKit.framework
+      - sdk: SwiftUI.framework
+      - sdk: AppIntents.framework
+    info:
+      path: Widgets/Info.plist
+      properties:
+        CFBundleDisplayName: Hermes
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+        HermesAppGroup: $(HERMES_APP_GROUP)
+        HermesKeychainGroup: $(AppIdentifierPrefix)$(HERMES_KEYCHAIN_GROUP)
+        HermesServerURL: $(HERMES_SERVER_URL)
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+    entitlements:
+      path: Widgets/HermesWidgets.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - $(HERMES_APP_GROUP)
+        keychain-access-groups:
+          - $(AppIdentifierPrefix)$(HERMES_KEYCHAIN_GROUP)
+    postBuildScripts:
+      # Release only: drop the plain-HTTP local-network exception (only the debug-only development
+      # server override needs it). Runs before code signing. Needs the script sandbox off because it
+      # edits the processed Info.plist in place.
+      - name: Strip local-network ATS exception (Release)
+        basedOnDependencyAnalysis: false
+        script: |
+          if [ "${CONFIGURATION}" = "Release" ]; then
+            plist="${TARGET_BUILD_DIR}/${INFOPLIST_PATH}"
+            /usr/libexec/PlistBuddy -c "Delete :NSAppTransportSecurity" "$plist" 2>/dev/null || true
+            /usr/libexec/PlistBuddy -c "Delete :NSLocalNetworkUsageDescription" "$plist" 2>/dev/null || true
+          fi
+    settings:
+      base:
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
+        PRODUCT_BUNDLE_IDENTIFIER: $(HERMES_BUNDLE_ID).widgets
+        PRODUCT_NAME: HermesWidgets
+        PROVISIONING_PROFILE_SPECIFIER: $(HERMES_WIDGETS_PROFILE)
+        TARGETED_DEVICE_FAMILY: "1"
+        SKIP_INSTALL: YES
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME: WidgetBackground
+        ENABLE_PREVIEWS: YES
+
+  # UI tests (simulator, Debug): passphrase sign-in, relaunch, offline/recovery, revoked token.
+  # Point them at a local dev server: HERMES_UITEST_SERVER_URL + HERMES_UITEST_PASSPHRASE
+  # (see UITests/HermesUITests.swift). Not part of the archive.
+  HermesUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: UITests
+    dependencies:
+      - target: Hermes
+    info:
+      path: UITests/Info.plist
+      properties:
+        # the runner talks to the local dev server directly (helper device, server switch)
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(HERMES_BUNDLE_ID).uitests
+        TEST_TARGET_NAME: Hermes
+        TARGETED_DEVICE_FAMILY: "1"
+
+schemes:
+  Hermes:
+    build:
+      targets:
+        Hermes: all
+        HermesWidgets: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - HermesUITests
+    archive:
+      config: Release
+  HermesWidgets:
+    build:
+      targets:
+        HermesWidgets: all
+        Hermes: all
+    run:
+      config: Debug
+      askForAppToLaunch: true

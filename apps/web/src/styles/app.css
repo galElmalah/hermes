@@ -1,0 +1,398 @@
+@import "tailwindcss";
+@import "./view-transitions.css";
+
+/* ───────────────────────────────────────────────────────────────────────────────
+   Hermes design tokens — docs/DESIGN_V2.md (normative; supersedes design.md §2–§4). Dark is the default.
+   Light overrides live on <html data-theme="light">. data-theme MUST be on <html>
+   because the semantic aliases below resolve on :root.
+   ─────────────────────────────────────────────────────────────────────────────── */
+@custom-variant light (&:where([data-theme=light], [data-theme=light] *));
+@custom-variant dark  (&:where(:root:not([data-theme=light]), :root:not([data-theme=light]) *));
+/* Fine pointer + real hover only (design.md §7: hover states only on hover-capable devices). */
+@custom-variant hocus (&:is(:hover, :focus-visible));
+
+@theme static {
+  /* Wipe Tailwind defaults so ad-hoc colors, shadows, radii, sizes and eases cannot be used. */
+  --color-*: initial;
+  --shadow-*: initial;
+  --inset-shadow-*: initial;
+  --drop-shadow-*: initial;
+  --text-shadow-*: initial;
+  --radius-*: initial;
+  --text-*: initial;
+  --ease-*: initial;
+
+  /* Absolute */
+  --color-black: #000000;
+  --color-white: #ffffff;
+  --color-transparent: transparent;
+  --color-current: currentColor;
+
+  /* Neutral ramp (dark) — soft near-black, faintly cool (DESIGN_V2 §2). Never pure black/white. */
+  --color-gray-1: oklch(0.165 0.006 var(--hue));
+  --color-gray-2: oklch(0.195 0.006 var(--hue));
+  --color-gray-3: oklch(0.225 0.006 var(--hue));
+  --color-gray-4: oklch(0.260 0.006 var(--hue));
+  --color-gray-5: oklch(0.290 0.006 var(--hue));
+  --color-gray-6: oklch(0.330 0.006 var(--hue));
+  --color-gray-7: oklch(0.380 0.006 var(--hue));
+  --color-gray-8: oklch(0.440 0.006 var(--hue));
+  --color-gray-9: oklch(0.500 0.006 var(--hue));
+  --color-gray-10: oklch(0.660 0.006 var(--hue));
+  --color-gray-11: oklch(0.780 0.006 var(--hue));
+  --color-gray-12: oklch(0.930 0.004 var(--hue));
+
+  /* Semantic neutrals */
+  --color-canvas: var(--color-gray-1);
+  --color-surface-1: var(--color-gray-2);
+  --color-surface-2: var(--color-gray-3);
+  --color-surface-3: var(--color-gray-4);
+  --color-surface-active: var(--color-gray-5);
+  --color-fg-1: var(--color-gray-12);
+  --color-fg-2: var(--color-gray-11);
+  --color-fg-3: var(--color-gray-10);
+  --color-fg-4: var(--color-gray-9);
+  --color-line-1: var(--line-1);
+  --color-line-2: var(--line-2);
+  --color-line-3: var(--line-3);
+  --color-glass: var(--glass);
+  --color-popup: var(--popup);
+  --color-scrim: var(--scrim);
+  --color-focus: var(--color-gray-12);
+
+  /* Accent — resolved from the raw --accent* variables set per theme and per <html data-accent>
+     (blue default, green, rose). Alpha steps and the zone ramp are mixes of the same colour. */
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-press: var(--accent-press);
+  --color-accent-ink: var(--accent-ink);
+  --color-on-accent: var(--on-accent);
+  --color-accent-a1: color-mix(in oklab, var(--accent) 6%, transparent);
+  --color-accent-a2: color-mix(in oklab, var(--accent) 10%, transparent);
+  --color-accent-a3: color-mix(in oklab, var(--accent) 16%, transparent);
+  --color-accent-a4: color-mix(in oklab, var(--accent) 24%, transparent);
+  --color-accent-a5: color-mix(in oklab, var(--accent) 40%, transparent);
+  --color-accent-a6: color-mix(in oklab, var(--accent) 64%, transparent);
+  --color-accent-a7: color-mix(in oklab, var(--accent) 85%, transparent);
+
+  /* Intensity zones: Z1 neutral then blue → aqua → yellow → red → violet → magenta (DESIGN_V2 §8).
+     Raw --z* values are set per theme below. */
+  --color-z1: var(--z1); --color-z2: var(--z2); --color-z3: var(--z3); --color-z4: var(--z4);
+  --color-z5: var(--z5); --color-z6: var(--z6); --color-z7: var(--z7);
+
+  /* Data colour (DESIGN_V2 §8): sport identity, status, chart series. Values are the validated
+     categorical palette (fixed order, CVD-checked on both canvases); raw values set per theme. */
+  --color-sport-bike: var(--c-blue);     --color-sport-run: var(--c-orange);   --color-sport-swim: var(--c-aqua);
+  --color-sport-walk: var(--c-yellow);   --color-sport-strength: var(--c-magenta); --color-sport-hike: var(--c-green);
+  --color-sport-row: var(--c-violet);    --color-sport-ski: var(--c-red);
+  --color-sport-yoga: var(--color-gray-9); --color-sport-other: var(--color-gray-9);
+  --color-series-1: var(--c-blue); --color-series-2: var(--c-orange); --color-series-3: var(--c-aqua);
+  --color-good: var(--s-good); --color-warn: var(--s-warn); --color-serious: var(--s-serious); --color-critical: var(--s-critical);
+
+  /* Grayscale sport ramp for stacked charts / mix bars (product.md §3.6.4). */
+  --color-ramp-1: var(--color-gray-12);
+  --color-ramp-2: var(--color-gray-11);
+  --color-ramp-3: var(--color-gray-10);
+  --color-ramp-4: var(--color-gray-9);
+  --color-ramp-5: var(--color-gray-8);
+  --color-ramp-6: var(--color-gray-7);
+
+  /* Type — closed scale 12/13/14/16/20/28 + one display size 44; weights 400/500/600 only. */
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, "SF Mono", Menlo, monospace;
+
+  --text-stat-xl: 2.75rem;  --text-stat-xl--line-height: 3rem;   --text-stat-xl--letter-spacing: -0.03em;  --text-stat-xl--font-weight: 500;
+  --text-stat-lg: 1.75rem;  --text-stat-lg--line-height: 2.25rem;--text-stat-lg--letter-spacing: -0.022em; --text-stat-lg--font-weight: 600;
+  --text-stat-md: 1.25rem;  --text-stat-md--line-height: 1.75rem;--text-stat-md--letter-spacing: -0.015em; --text-stat-md--font-weight: 600;
+  --text-stat-sm: 1rem;     --text-stat-sm--line-height: 1.5rem; --text-stat-sm--letter-spacing: -0.008em; --text-stat-sm--font-weight: 600;
+  --text-title-1: 1.75rem;  --text-title-1--line-height: 2.25rem;--text-title-1--letter-spacing: -0.022em; --text-title-1--font-weight: 600;
+  --text-title-2: 1.25rem;  --text-title-2--line-height: 1.75rem;--text-title-2--letter-spacing: -0.015em; --text-title-2--font-weight: 600;
+  --text-title-3: 1rem;     --text-title-3--line-height: 1.5rem; --text-title-3--letter-spacing: -0.008em; --text-title-3--font-weight: 600;
+  --text-body-lg: 1rem;     --text-body-lg--line-height: 1.5rem; --text-body-lg--letter-spacing: -0.006em; --text-body-lg--font-weight: 400;
+  --text-body: 0.875rem;    --text-body--line-height: 1.25rem;   --text-body--letter-spacing: -0.003em;    --text-body--font-weight: 400;
+  --text-body-sm: 0.8125rem;--text-body-sm--line-height: 1.125rem;--text-body-sm--font-weight: 400;
+  --text-label: 0.75rem;    --text-label--line-height: 1rem;     --text-label--letter-spacing: 0;          --text-label--font-weight: 500;
+  /* v2: micro is an alias of label (sentence case, no tracking). Never pair with `uppercase`. */
+  --text-micro: 0.75rem;    --text-micro--line-height: 1rem;     --text-micro--letter-spacing: 0;          --text-micro--font-weight: 400;
+  /* v2: text-mono / text-mono-sm are size tokens only (= body-sm / label). Numbers use the sans. */
+  --text-mono: 0.8125rem;   --text-mono--line-height: 1.125rem;  --text-mono--font-weight: 400;
+  --text-mono-sm: 0.75rem;  --text-mono-sm--line-height: 1rem;   --text-mono-sm--letter-spacing: 0;       --text-mono-sm--font-weight: 400;
+
+  /* Spacing / radius / containers / breakpoints */
+  --spacing: 0.25rem;
+  --radius-xs: 4px; --radius-sm: 6px; --radius-md: 10px; --radius-lg: 14px;
+  --radius-xl: 20px; --radius-2xl: 28px; --radius-full: 9999px;
+  --container-prose: 45rem;   /* 720 */
+  --container-palette: 40rem; /* 640 */
+  --container-page: 70rem;    /* 1120 */
+  --breakpoint-sm: 40rem; --breakpoint-md: 48rem; --breakpoint-lg: 64rem;
+  --breakpoint-xl: 80rem; --breakpoint-2xl: 96rem;
+
+  /* Depth (inset only; no drop shadows). --inset-shadow-hairline lives on :root (below) so the
+     light theme can override it; Tailwind would inline a @theme value into the utility. */
+  --blur-glass: 20px;
+
+  /* Easing: cubic-bezier + springs as linear() generated by motion-dom 14.14 */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in: cubic-bezier(0.55, 0, 1, 0.45);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-spring-snappy: linear(0, 0.2531, 0.5773, 0.7868, 0.8991, 0.9541, 0.9797, 0.9912, 0.9963, 0.9984, 0.9993, 1, 1);
+  --ease-spring-smooth: linear(0, 0.0958, 0.2832, 0.4752, 0.6371, 0.7605, 0.8484, 0.9078, 0.9463, 0.9702, 0.9845, 0.9926, 0.997, 0.9992, 1.0002, 1, 1);
+  --ease-spring-gentle: linear(0, 0.0426, 0.1386, 0.255, 0.3732, 0.4831, 0.5803, 0.6633, 0.7326, 0.7894, 0.8352, 0.8718, 0.9008, 0.9236, 0.9413, 0.9551, 0.9658, 0.974, 0.9803, 0.9851, 0.9887, 0.9915, 0.9936, 0.9952, 0.9964, 0.9973, 0.998, 0.9985, 0.9989, 1);
+  --ease-spring-bouncy: linear(0, 0.0707, 0.2291, 0.4151, 0.5925, 0.7422, 0.8576, 0.9392, 0.9919, 1.0218, 1.0354, 1.0384, 1.035, 1.0287, 1.0215, 1.0148, 1.0092, 1.005, 1.002, 1.0001, 0.9991, 1, 1);
+
+  --animate-sheen: sheen 1.8s linear infinite;
+  --animate-dot-pulse: dot-pulse 1.2s var(--ease-in-out) infinite;
+  --animate-live: live 2.4s var(--ease-out) infinite;
+  @keyframes sheen { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+  @keyframes dot-pulse { 0%, 80%, 100% { opacity: 0.25; } 40% { opacity: 1; } }
+  @keyframes live { 0% { transform: scale(1); opacity: 0.7; } 70%, 100% { transform: scale(2.6); opacity: 0; } }
+}
+
+/* Durations (not a Tailwind namespace; use `duration-(--dur-fast)`). Spring durations pair with the linear() curves above. */
+:root {
+  --dur-fast: 140ms; --dur-base: 240ms; --dur-slow: 420ms;
+  --dur-spring-snappy: 400ms; --dur-spring-smooth: 500ms; --dur-spring-gentle: 900ms; --dur-spring-bouncy: 700ms;
+  --z-sticky: 10; --z-rail: 20; --z-drag: 40; --z-popover: 50; --z-toast: 60; --z-palette: 70;
+  /* Shell geometry (read by the shell + sticky offsets in pages). */
+  --rail-w: 0px; --header-h: 52px; --bottom-bar-h: 0px;
+  --inset-shadow-hairline: inset 0 0 0 0 transparent; /* v2: no hairline highlights */
+  --line-1: rgb(255 255 255 / 0.06); --line-2: rgb(255 255 255 / 0.10); --line-3: rgb(255 255 255 / 0.16);
+  /* Chrome and floating surfaces are fully OPAQUE (owner: "it should have 100% opacity"): page
+     text must never bleed through a bar, menu, popover, tooltip or the palette. `glass` keeps its
+     name for the fixed chrome (bottom bar, sticky page bar, rail overlay) = surface-1; `popup` is
+     every floating surface, one step above (surface-2) so it separates from cards. No blur. */
+  --glass: oklch(0.195 0.006 var(--hue)); --popup: oklch(0.225 0.006 var(--hue)); --scrim: rgb(0 0 0 / 0.50);
+  /* Accent (dark): calm blue by default; neutrals are tinted with the same hue. */
+  --hue: 252;
+  --accent: oklch(0.72 0.12 252); --accent-hover: oklch(0.77 0.11 252); --accent-press: oklch(0.67 0.12 252);
+  --accent-ink: oklch(0.78 0.10 252); --on-accent: oklch(0.20 0.012 252);
+  /* Categorical hues (dark steps) */
+  --c-blue: #3987e5; --c-orange: #d95926; --c-aqua: #199e70; --c-yellow: #c98500;
+  --c-magenta: #d55181; --c-green: #0ca30c; --c-violet: #9085e9; --c-red: #e66767;
+  /* Status (always with an icon + label) */
+  --s-good: #0ca30c; --s-warn: #fab219; --s-serious: #ec835a; --s-critical: #e05252;
+  /* Training zones: Z1 neutral, then the familiar cool → warm order. Adjacent steps are CVD-checked;
+     always paired with a label, height or position. */
+  --z1: var(--color-gray-8); --z2: #3987e5; --z3: #199e70; --z4: #cf9a00; --z5: #e2554f; --z6: #9085e9; --z7: #d55181;
+  color-scheme: dark;
+  interpolate-size: allow-keywords; /* Chromium-only progressive enhancement */
+}
+:root[data-accent="green"] {
+  --hue: 160;
+  --accent: oklch(0.76 0.11 160); --accent-hover: oklch(0.81 0.10 160); --accent-press: oklch(0.71 0.11 160);
+  --accent-ink: oklch(0.80 0.10 160); --on-accent: oklch(0.20 0.010 160);
+}
+:root[data-accent="rose"] {
+  --hue: 8;
+  --accent: oklch(0.76 0.10 8); --accent-hover: oklch(0.81 0.09 8); --accent-press: oklch(0.71 0.10 8);
+  --accent-ink: oklch(0.80 0.085 8); --on-accent: oklch(0.20 0.010 8);
+}
+
+/* Light theme */
+:root[data-theme="light"] {
+  color-scheme: light;
+  /* gray-2..5 deepened (ui engineer, v2): with borders gone, white cards on a 0.990 canvas were
+     indistinguishable (≈1.03:1). Canvas 0.974 lets a white surface-1 card read as a surface step;
+     surface-2/3/active move down so wells and secondary buttons still separate from the canvas. */
+  --color-gray-1: oklch(1 0 0);                       --color-gray-2: oklch(0.974 0.004 var(--hue));  --color-gray-3: oklch(0.952 0.006 var(--hue));
+  --color-gray-4: oklch(0.930 0.006 var(--hue));      --color-gray-5: oklch(0.906 0.006 var(--hue));  --color-gray-6: oklch(0.885 0.006 var(--hue));
+  --color-gray-7: oklch(0.860 0.006 var(--hue));      --color-gray-8: oklch(0.790 0.006 var(--hue));  --color-gray-9: oklch(0.660 0.006 var(--hue));
+  --color-gray-10: oklch(0.520 0.009 var(--hue));     --color-gray-11: oklch(0.430 0.009 var(--hue)); --color-gray-12: oklch(0.220 0.009 var(--hue));
+  --color-surface-1: var(--color-gray-1);  /* light: cards are white on a gray-2 canvas */
+  --color-canvas: var(--color-gray-2);
+  --line-1: rgb(0 0 0 / 0.07); --line-2: rgb(0 0 0 / 0.11); --line-3: rgb(0 0 0 / 0.17);
+  --glass: oklch(1 0 0); --popup: oklch(1 0 0); --scrim: rgb(0 0 0 / 0.24);
+  --accent: oklch(0.53 0.14 252); --accent-hover: oklch(0.49 0.135 252); --accent-press: oklch(0.45 0.125 252);
+  --accent-ink: oklch(0.50 0.135 252); --on-accent: oklch(1 0 0);
+  --c-blue: #2a78d6; --c-orange: #eb6834; --c-aqua: #1baf7a; --c-yellow: #eda100;
+  --c-magenta: #e87ba4; --c-green: #008300; --c-violet: #6250d6; --c-red: #e34948;
+  --s-good: #008300; --s-warn: #c98500; --s-serious: #d95926; --s-critical: #d03b3b;
+  --z1: var(--color-gray-8); --z2: #2a78d6; --z3: #1baf7a; --z4: #eda100; --z5: #e34948; --z6: #6250d6; --z7: #e87ba4;
+}
+:root[data-theme="light"][data-accent="green"] {
+  --accent: oklch(0.50 0.10 160); --accent-hover: oklch(0.46 0.095 160); --accent-press: oklch(0.42 0.09 160);
+  --accent-ink: oklch(0.48 0.10 160);
+}
+:root[data-theme="light"][data-accent="rose"] {
+  --accent: oklch(0.54 0.14 8); --accent-hover: oklch(0.50 0.14 8); --accent-press: oklch(0.46 0.13 8);
+  --accent-ink: oklch(0.51 0.14 8);
+}
+
+/* ───────────────────────────── base layer ───────────────────────────── */
+@layer base {
+  html { background: var(--color-canvas); color: var(--color-fg-1); font-family: var(--font-sans);
+         font-size: 100%; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+         text-rendering: optimizeLegibility; -webkit-tap-highlight-color: transparent; }
+  body { min-height: 100dvh; background: var(--color-canvas);
+         font-size: var(--text-body); line-height: var(--text-body--line-height);
+         letter-spacing: var(--text-body--letter-spacing); font-weight: 400;
+         font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
+  :focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+  ::selection { background: var(--color-accent-a5); color: var(--color-fg-1); }
+  h1, h2, h3, h4 { text-wrap: balance; }
+  p { text-wrap: pretty; }
+  /* Calm native controls. */
+  button:not(:disabled), [role="button"]:not([aria-disabled="true"]), summary { cursor: default; }
+  a { color: inherit; text-decoration: none; }
+  input, textarea, select, button { font: inherit; letter-spacing: inherit; color: inherit; }
+  input::placeholder, textarea::placeholder { color: var(--color-fg-4); }
+  :disabled, [data-disabled] { cursor: not-allowed; }
+  [hidden] { display: none !important; }
+
+  /* Scrollbars: thin, monochrome, quiet until hovered. */
+  * { scrollbar-width: thin; scrollbar-color: var(--color-gray-6) transparent; }
+  *:hover { scrollbar-color: var(--color-gray-8) transparent; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--color-gray-6); border-radius: 9999px;
+                              border: 3px solid transparent; background-clip: content-box; }
+  ::-webkit-scrollbar-thumb:hover { background-color: var(--color-gray-8); }
+}
+
+/* Reduced motion: OS setting or the in-app preference (<html data-motion="reduced">). */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important;
+                           transition-duration: 1ms !important; scroll-behavior: auto !important; }
+}
+:root[data-motion="reduced"] *, :root[data-motion="reduced"] *::before, :root[data-motion="reduced"] *::after {
+  animation-duration: 1ms !important; animation-iteration-count: 1 !important;
+  transition-duration: 1ms !important; scroll-behavior: auto !important;
+}
+
+/* ───────────────────────────── utilities ───────────────────────────── */
+@utility bg-hatch-accent { background-image: repeating-linear-gradient(135deg, var(--color-accent) 0 1.5px, transparent 1.5px 5px); }
+@utility bg-hatch-fg     { background-image: repeating-linear-gradient(135deg, var(--color-fg-3) 0 1px, transparent 1px 5px); }
+@utility bg-hatch-faint  { background-image: repeating-linear-gradient(135deg, var(--color-line-2) 0 1px, transparent 1px 6px); }
+@utility bg-dots-fg      { background-image: radial-gradient(var(--color-fg-3) 0.75px, transparent 1px); background-size: 4px 4px; }
+/* `glass` = the opaque chrome surface (name kept); `popup-surface` = opaque floating surface. */
+@utility glass { background: var(--color-glass); }
+@utility popup-surface { background: var(--color-popup); }
+@utility inset-shadow-hairline { box-shadow: var(--inset-shadow-hairline); }
+@utility glass-blur { backdrop-filter: blur(var(--blur-glass)) saturate(1.4); -webkit-backdrop-filter: blur(var(--blur-glass)) saturate(1.4); }
+@utility num { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
+/* Dense grids: focus ring inside the cell. */
+@utility focus-inset { &:focus-visible { outline-offset: -2px; } }
+/* Fields: 2px ring drawn inside the control. */
+@utility focus-field { &:focus-visible, &:focus-within:has(:focus-visible) { outline: 2px solid var(--color-focus); outline-offset: -1px; } }
+@utility scrollbar-none { scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
+@utility pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+@utility tracking-tightest { letter-spacing: -0.045em; }
+/* Data tints (DESIGN_V2 §8): a completed card/chip carries ≤ 14% of its sport colour over a surface.
+   Set `--sport` on the element (sportVars() in ui/domain/dataColor.ts); falls back to neutral. */
+@utility bg-sport-tint { background-color: color-mix(in oklab, var(--sport, var(--color-fg-4)) 12%, var(--color-surface-1)); }
+@utility bg-sport-tint-hover { background-color: color-mix(in oklab, var(--sport, var(--color-fg-4)) 14%, var(--color-surface-2)); }
+@utility bg-sport-tint-faint { background-color: color-mix(in oklab, var(--sport, var(--color-fg-4)) 8%, transparent); }
+/* A small solid swatch / dot in the sport colour (legends, breakdown marks). */
+@utility bg-sport { background-color: var(--sport, var(--color-fg-4)); }
+@utility text-sport { color: var(--sport, currentColor); }
+
+/* ───────────────────────────── components (shared CSS) ───────────────────────────── */
+@layer components {
+  /* (l) Pointer-tracked spotlight on cards — design.md §5.4l. Set --mx/--my via onSpotlightMove. */
+  .spotlight { position: relative; isolation: isolate; }
+  .spotlight::before {
+    content: ""; position: absolute; inset: -1px; border-radius: inherit; padding: 1px; pointer-events: none;
+    background: radial-gradient(240px circle at var(--mx, 50%) var(--my, -100%), var(--spot, var(--color-line-3)), transparent 70%);
+    mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+    opacity: 0; transition: opacity var(--dur-base) var(--ease-out); }
+  .spotlight::after {
+    content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: -1;
+    background: radial-gradient(320px circle at var(--mx, 50%) var(--my, -100%), rgb(255 255 255 / 0.035), transparent 60%);
+    opacity: 0; transition: opacity var(--dur-base) var(--ease-out); }
+  .spotlight:focus-visible { --mx: 50%; --my: 0%; }
+  .spotlight-accent { --spot: var(--color-line-3); } /* v2: no accent glows — kept as an alias */
+  :root[data-theme=light] .spotlight::after {
+    background: radial-gradient(320px circle at var(--mx, 50%) var(--my, -100%), rgb(0 0 0 / 0.03), transparent 60%); }
+  @media (hover: hover) {
+    .spotlight:hover::before, .spotlight:hover::after { opacity: 1; }
+  }
+  .spotlight:focus-visible::before, .spotlight:focus-within::before { opacity: 1; }
+
+  /* Skeleton sheen (static under reduced motion via the global rule). */
+  .skeleton { background-color: var(--color-surface-2); background-image: linear-gradient(90deg, transparent 30%, rgb(255 255 255 / 0.045) 50%, transparent 70%);
+              background-size: 200% 100%; animation: var(--animate-sheen); }
+  :root[data-theme=light] .skeleton { background-image: linear-gradient(90deg, transparent 30%, rgb(255 255 255 / 0.7) 50%, transparent 70%); }
+  :root[data-motion=reduced] .skeleton { animation: none; background-image: none; }
+  @media (prefers-reduced-motion: reduce) { .skeleton { animation: none; background-image: none; } }
+
+  /* Floating popups (popover, select, menu, combobox, date picker): origin-aware scale .96 → 1. */
+  .ui-popup {
+    background: var(--color-popup);
+    border: 1px solid var(--color-line-2); color: var(--color-fg-1);
+    transform-origin: var(--transform-origin);
+    transition: transform var(--dur-spring-smooth) var(--ease-spring-smooth), opacity var(--dur-base) var(--ease-out);
+    outline: none; }
+  .ui-popup[data-starting-style] { opacity: 0; transform: scale(0.96); }
+  .ui-popup[data-ending-style] { opacity: 0; transform: scale(0.98); transition: transform 140ms var(--ease-in), opacity 140ms var(--ease-in); }
+  .ui-popup[data-instant] { transition: none; }
+
+  .ui-tooltip {
+    background: var(--color-popup);
+    border: 1px solid var(--color-line-2); color: var(--color-fg-1); transform-origin: var(--transform-origin);
+    transition: transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out); }
+  .ui-tooltip[data-starting-style], .ui-tooltip[data-ending-style] { opacity: 0; transform: scale(0.96); }
+  .ui-tooltip[data-instant] { transition: none; }
+
+  /* Toasts — design.md §5.4i. Stack via Base UI --toast-index / --toast-offset-y. */
+  .ui-toast {
+    --gap: 8px; --peek: 7px;
+    --scale: calc(max(0, 1 - (var(--toast-index) * 0.04)));
+    --shrink: calc(1 - var(--scale));
+    --height: var(--toast-frontmost-height, var(--toast-height));
+    --offset-y: calc(var(--toast-offset-y) * -1 + (var(--toast-index) * var(--gap) * -1) + var(--toast-swipe-movement-y));
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: calc(1000 - var(--toast-index));
+    transform-origin: bottom center; height: var(--height);
+    transform: translateX(var(--toast-swipe-movement-x)) translateY(calc(var(--toast-swipe-movement-y) - (var(--toast-index) * var(--peek)) - (var(--shrink) * var(--height)))) scale(var(--scale));
+    transition: transform var(--dur-spring-smooth) var(--ease-spring-smooth), opacity var(--dur-base) var(--ease-out), height var(--dur-fast) var(--ease-out);
+  }
+  .ui-toast::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: calc(var(--gap) + 1px); }
+  .ui-toast[data-expanded] { transform: translateX(var(--toast-swipe-movement-x)) translateY(var(--offset-y)); height: var(--toast-height); }
+  .ui-toast[data-starting-style] { opacity: 0; transform: translateY(16px) scale(0.98); }
+  .ui-toast[data-limited] { opacity: 0; pointer-events: none; }
+  .ui-toast[data-ending-style] { opacity: 0; transition: transform 160ms var(--ease-in), opacity 160ms var(--ease-in); }
+  .ui-toast[data-ending-style]:not([data-limited]):not([data-swipe-direction]) { transform: translateY(calc(var(--offset-y, 0px) + 8px)); }
+  .ui-toast[data-ending-style][data-swipe-direction=down] { transform: translateY(calc(var(--toast-swipe-movement-y) + 150%)); }
+  .ui-toast[data-ending-style][data-swipe-direction=left] { transform: translateX(calc(var(--toast-swipe-movement-x) - 150%)) translateY(var(--offset-y)); }
+  .ui-toast[data-ending-style][data-swipe-direction=right] { transform: translateX(calc(var(--toast-swipe-movement-x) + 150%)) translateY(var(--offset-y)); }
+  .ui-toast-content { transition: opacity var(--dur-base) var(--ease-out); }
+  .ui-toast-content[data-behind] { opacity: 0; }
+  .ui-toast-content[data-expanded] { opacity: 1; }
+  .ui-toast-countdown { transform-origin: left center; animation: toast-countdown var(--toast-timeout, 6000ms) linear forwards; }
+  .ui-toast:hover .ui-toast-countdown, .ui-toast:focus-within .ui-toast-countdown,
+  [data-toast-paused] .ui-toast-countdown { animation-play-state: paused; }
+  @keyframes toast-countdown { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+
+  /* Command palette — design.md §5.4j. */
+  .ui-palette-backdrop { background: var(--color-scrim); transition: opacity var(--dur-base) var(--ease-out); }
+  .ui-palette-backdrop[data-starting-style], .ui-palette-backdrop[data-ending-style] { opacity: 0; }
+  .ui-palette {
+    transition: transform var(--dur-spring-smooth) var(--ease-spring-smooth), opacity var(--dur-base) var(--ease-out), filter var(--dur-base) var(--ease-out); }
+  .ui-palette[data-starting-style] { opacity: 0; transform: translateY(-8px) scale(0.96); filter: blur(4px); }
+  .ui-palette[data-ending-style] { opacity: 0; transform: translateY(-4px) scale(0.98); filter: blur(2px);
+    transition: transform 140ms var(--ease-in), opacity 140ms var(--ease-in), filter 140ms var(--ease-in); }
+
+  /* Small enters for non-Base-UI elements (chips, inline confirms). */
+  .enter-pop { transition: transform var(--dur-spring-snappy) var(--ease-spring-snappy), opacity var(--dur-fast) var(--ease-out);
+               @starting-style { transform: scale(0.9); opacity: 0; } }
+
+  /* (§5.6) Scroll-driven chrome: the sticky bar is always opaque (canvas at the top, the chrome
+     surface + hairline once scrolled — never see-through); it turns solid and the compact title (18px) takes
+     over from the large title (32px) as it scrolls under the bar (large-title pattern; no layout
+     animation). Without scroll timelines the bar is permanently glass and the compact title hidden. */
+  .page-bar { background-color: var(--color-canvas); border-color: transparent; }
+  .page-bar[data-solid] { background-color: var(--color-glass); border-color: var(--color-line-1); animation: none !important; }
+  .page-bar-title { opacity: 0; visibility: hidden; }
+  @supports not (animation-timeline: scroll()) {
+    .page-bar { background-color: var(--color-glass); border-color: var(--color-line-1); }
+  }
+  @supports (animation-timeline: scroll()) {
+    .page-bar { animation: bar-glass linear both; animation-timeline: scroll(root block); animation-range: 8px 56px; }
+    .page-bar-title { visibility: visible; animation: bar-title linear both; animation-timeline: scroll(root block); animation-range: 40px 88px; }
+    .page-hero-title { transform-origin: left center; animation: hero-title linear both; animation-timeline: scroll(root block); animation-range: 0 88px; }
+    @keyframes bar-glass { from { background-color: var(--color-canvas); border-color: transparent; } to { background-color: var(--color-glass); border-color: var(--color-line-1); } }
+    @keyframes bar-title { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+    @keyframes hero-title { to { opacity: 0.2; transform: scale(0.94); } }
+  }
+}

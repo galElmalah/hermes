@@ -1,0 +1,36 @@
+{
+  "name": "hermes",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Hermes — a self-hosted training platform: plan workouts, sync with Garmin, analyse, and let AI agents coach you over MCP. Runs on Cloudflare Workers + D1.",
+  "type": "module",
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "pnpm --filter @cadence/web build",
+    "deploy": "pnpm --filter @cadence/web run deploy",
+    "dev": "pnpm --filter @cadence/web dev",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test"
+  },
+  "devDependencies": {
+    "typescript": "6.0.3",
+    "vitest": "4.1.12"
+  },
+  "license": "MIT",
+  "cloudflare": {
+    "bindings": {
+      "SESSION_SECRET": {
+        "description": "Signs session cookies. Generate one with `openssl rand -base64 32`. Changing it later signs everyone out."
+      },
+      "ENCRYPTION_KEY": {
+        "description": "Encrypts your stored Garmin credentials. Generate one with `openssl rand -base64 32` and **keep it**: changing it means reconnecting Garmin."
+      },
+      "DB": {
+        "description": "D1 database for all your training data. Created for you; migrations run on every deploy."
+      }
+    }
+  }
+}
