@@ -85,7 +85,7 @@ Feature folders never import from each other; shared things move down into `ui/`
   HMAC-signed, HttpOnly session cookie. All `/api/*` except `/api/auth/*` and `/api/health` require it
   (or, for native clients, an `Authorization: Bearer cad_…` device token — `docs/MOBILE_API.md`;
   `GET/DELETE auth/devices…` are protected too). The MCP endpoint `/mcp` takes device tokens only,
-  obtained either by pasting one from Settings → Devices or through OAuth 2.1 (`worker/oauth`:
+  obtained either by pasting one from Settings → Agents or through OAuth 2.1 (`worker/oauth`:
   RFC 9728/8414 discovery, RFC 7591 registration, code + PKCE S256; the consent page asks for the
   passphrase; the access token is a device token — `docs/MCP.md` → OAuth).
 - **Sign-in lifetime**: every sign-in lasts 30 days from the passphrase entry — session cookie,

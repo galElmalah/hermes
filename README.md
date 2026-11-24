@@ -25,7 +25,7 @@ and let an AI agent coach you over MCP. Runs on your own Cloudflare account (Wor
   revocable device token.
 - **MCP server for AI agents** at `/mcp`: Claude, Claude Code, Codex or any MCP client can read your
   training and manage your plan. Clients with OAuth connect with just the URL (you approve with your
-  passphrase); others use a revocable token from Settings → Agents (`docs/MCP.md`).
+  passphrase); others use a revocable token from Settings → Agents (`docs/USING_AGENTS.md`).
 - Every sign-in (browser, iPhone, agent) lasts 30 days, then asks for the passphrase again.
 
 ## Repository
@@ -109,10 +109,25 @@ already have a database (or want different names), put your own copy in `wrangle
 Keep `DEMO_MODE` at `"0"`. Put Cloudflare Access in front of the Worker if you want a second lock
 on the door.
 
-### iPhone
+## iPhone app
 
-Install the app from TestFlight (or build it yourself, see `apps/ios/README.md`), then enter your
-Worker's address and passphrase on the first screen.
+The iOS app (with Home Screen and Lock Screen widgets) works with any Hermes deployment.
+
+1. **Get access:** the app is distributed through TestFlight. Email
+   [galelmalah@gmail.com](mailto:galelmalah@gmail.com?subject=Hermes%20TestFlight%20access) with
+   the Apple ID email you want invited, and you'll get a TestFlight invite.
+2. Install **TestFlight** from the App Store, open the invite and install Hermes.
+3. On the first screen, enter your server address (e.g. `hermes.yourname.workers.dev`) and your
+   passphrase. The phone gets its own token, which you can see and revoke in Settings → Devices.
+
+Prefer to build it yourself? See `apps/ios/README.md`. It needs Xcode and your own Apple developer
+team.
+
+## AI agents
+
+Point Claude, Claude Code, Codex or any MCP client at `https://<your-worker>/mcp` and it can review
+your training and manage your plan. See **[docs/USING_AGENTS.md](docs/USING_AGENTS.md)** for how to
+connect and example prompts, and `docs/MCP.md` for the technical reference.
 
 ## Connecting your Garmin
 

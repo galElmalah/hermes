@@ -9,13 +9,13 @@ manage the plan. It runs inside the same Worker as the app; there are no extra b
 | Endpoint | `https://<your-worker>/mcp` (e.g. `https://hermes.yourname.workers.dev/mcp`) |
 | Transport | Streamable HTTP, stateless: `POST` only (`GET`/`DELETE` → `405`), no `Mcp-Session-Id` |
 | Protocol | MCP **2026-07-28**, plus 2025-era clients (`initialize` handshake: 2025-11-25, 2025-06-18, 2025-03-26) |
-| Auth | `Authorization: Bearer cad_…`, a revocable device token valid 30 days, obtained through **OAuth 2.1** (approve with your passphrase) or pasted from Settings → Devices |
+| Auth | `Authorization: Bearer cad_…`, a revocable device token valid 30 days, obtained through **OAuth 2.1** (approve with your passphrase) or pasted from Settings → Agents |
 | Code | `apps/web/worker/mcp/` (official SDK `@modelcontextprotocol/server`, loaded lazily on the first `/mcp` request) |
 
 ## Connecting
 
 Two ways, both ending in the same kind of credential: a device token (`cad_…`) that lasts **30 days
-from the moment you typed your passphrase**, shows up in Settings → Devices with platform "AI agent",
+from the moment you typed your passphrase**, shows up in Settings → Agents,
 and can be revoked there at once (within 30 s on other Worker isolates). Changing the passphrase
 revokes every token. After 30 days the client gets a `401` and has to be approved again — there is no
 refresh token and no sliding renewal, by design.
@@ -27,7 +27,7 @@ Claude Code, Codex, MCP Inspector …) only need the endpoint URL. On first use 
 discover Hermes' authorization server, register themselves and open a Hermes page in the browser:
 **Connect "<client>" to Hermes**, showing the client's name and the address it returns to. Enter your
 passphrase and choose **Allow access**. The client is connected for 30 days and appears in Settings →
-Devices under its own name.
+Agents under its own name.
 
 - **Claude (claude.ai / desktop)**: Settings → Connectors → Add custom connector → URL
   `https://<your-worker>/mcp` → Connect.
@@ -40,10 +40,10 @@ shared with `POST /api/auth/login` and `POST /api/auth/devices`).
 
 ### With a pasted token
 
-Settings → Devices → **Agent access (MCP)**: give the agent a name (e.g. "Claude Code"), confirm
+Settings → Agents → **Connect an agent**: give the agent a name (e.g. "Claude Code"), confirm
 with your passphrase, then **Create agent token**. The token is shown **once**, with copy buttons
-and ready-to-paste setup snippets for this server's address. The agent then appears in the Devices
-table with platform "AI agent", a "Last used" time and when it expires.
+and ready-to-paste setup snippets for this server's address. The agent then appears in the Agents
+table with a short token fingerprint, how it connected, a "Last used" time and when it expires.
 
 Under the hood this is `POST /api/auth/devices { passphrase, name, platform: "agent" }`
 (`docs/MOBILE_API.md` §1), so you can also mint one from a script.
@@ -164,7 +164,7 @@ bindings, D1 only). Spec: MCP authorization (draft as of 2026-11), OAuth 2.1.
 | Code | 32 random bytes, 5-minute lifetime, single use; only its SHA-256 is stored (`oauth_codes`). Exchanging a code twice revokes the token issued for it |
 | Token | `POST /oauth/token` (form or JSON), `grant_type=authorization_code` only, `code_verifier` + `redirect_uri` + `client_id` required → `{ access_token: "cad_…", token_type: "Bearer", expires_in }`, `Cache-Control: no-store`. The token is a device row (`platform: "agent"`, name = client name) whose expiry is 30 days after the passphrase entry |
 | No refresh tokens | The access token already lasts the full 30 days one passphrase entry allows, so a refresh token could not extend anything. Clients handle a missing `refresh_token` by re-running the flow on the `401` after expiry |
-| Revocation | Settings → Devices → Revoke (or `DELETE /api/auth/devices/:id`). A passphrase change deletes every device and every pending code |
+| Revocation | Settings → Agents → Revoke (or `DELETE /api/auth/devices/:id`). A passphrase change deletes every device and every pending code |
 | CORS | `Access-Control-Allow-Origin: *` (no credentials) on the metadata, registration and token endpoints for browser-based clients; never on `/api` or the consent page |
 
 ## Limits and notes

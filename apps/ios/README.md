@@ -4,6 +4,10 @@ Native iPhone app and widgets for Hermes. It talks to the same Cloudflare Worker
 authenticated with a revocable **device token** (docs/MOBILE_API.md). iOS 17+, SwiftUI, WidgetKit,
 no third-party dependencies.
 
+**Just want to use it?** Install it from TestFlight instead of building: email
+[galelmalah@gmail.com](mailto:galelmalah@gmail.com?subject=Hermes%20TestFlight%20access) with your
+Apple ID email for an invite (see the main README, *iPhone app*).
+
 ```
 apps/ios/
   project.yml            XcodeGen spec (app "Hermes" + widget extension "HermesWidgets")

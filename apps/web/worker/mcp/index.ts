@@ -9,7 +9,7 @@
  * Auth: a device token (`Authorization: Bearer cad_…`, docs/MOBILE_API.md §1) — the same revocable,
  * 30-day tokens as the iPhone app. A client gets one either by OAuth (worker/oauth: the 401 below
  * points at the protected resource metadata, the owner approves with the passphrase) or pasted from
- * Settings → Devices → "Agent access (MCP)". Cookies are never accepted here. Tools reach the API
+ * Settings → Agents → "Connect an agent". Cookies are never accepted here. Tools reach the API
  * in-process with that same token (./api.ts).
  */
 import { Hono } from 'hono';
@@ -34,7 +34,7 @@ function unauthorized(req: Request, message: string, invalidToken: boolean): Res
     {
       error: {
         code: 'unauthorized',
-        message: `${message} Connect with OAuth (approve with your Hermes passphrase), or create a token in Hermes → Settings → Devices → Agent access (MCP) and send it as "Authorization: Bearer cad_…".`,
+        message: `${message} Connect with OAuth (approve with your Hermes passphrase), or create a token in Hermes → Settings → Agents and send it as "Authorization: Bearer cad_…".`,
       },
     },
     { status: 401, headers: { 'WWW-Authenticate': challenge } },

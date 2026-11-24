@@ -10,7 +10,7 @@ Please **do not open a public issue**. Use GitHub's private reporting instead: t
 ## How Hermes protects your instance
 
 - One passphrase per instance; sign-in attempts are throttled. Every session, device and agent token
-  expires after 30 days and can be revoked in Settings → Devices / Agents.
+  expires after 30 days and can be revoked in Settings → Devices (iPhone) or Settings → Agents.
 - Device and agent tokens are stored only as SHA-256 hashes; Garmin credentials are encrypted with
   AES-GCM under your `ENCRYPTION_KEY`.
 - MCP clients connect through OAuth 2.1 with PKCE, approved with your passphrase.

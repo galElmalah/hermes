@@ -77,7 +77,7 @@ export function consentPage(v: ConsentView): string {
   return document(
     `Connect ${v.clientName}`,
     `<h1>Connect “${name}” to Hermes</h1>
-<p>It will be able to read your training and manage your plan through the Hermes MCP server. The connection lasts 30 days; it shows up in Settings → Devices, where you can revoke it.</p>
+<p>It will be able to read your training and manage your plan through the Hermes MCP server. The connection lasts 30 days; it shows up in Settings → Agents, where you can revoke it.</p>
 <dl><dt>App</dt><dd>${name}</dd><dt>Returns to</dt><dd><code>${esc(v.redirectTarget)}</code></dd></dl>
 <form method="post" action="/oauth/authorize">
 <input type="hidden" name="request" value="${esc(v.request)}">
